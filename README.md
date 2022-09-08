@@ -1,4 +1,5 @@
 [![license](https://img.shields.io/github/license/jamesisaac/react-native-background-task.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://badge.fury.io/js/deployment-tool.svg)](https://badge.fury.io/js/deployment-tool)
 
 # Mainnet Deployment Tool
 
