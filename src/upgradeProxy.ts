@@ -15,7 +15,14 @@ const upgradeProxy = async (
     extra?: any,
     skipGit?: boolean,
     verifyContract?: boolean
-) => {
+): Promise<{
+    success: boolean
+    message: string
+    contractName?: string
+    contract?: any
+    proxyAdminAddress?: string
+    proxyAddress?: string
+}> => {
     try {
         // Set a timeout for the deployment
         let keepWaiting = true
@@ -24,6 +31,8 @@ const upgradeProxy = async (
         }, 60000)
 
         const logOutput = []
+        let upgradedContract: any = null
+        let ProxyAdminAddress: string = ''
 
         while (keepWaiting) {
             // Get deployer account
@@ -38,8 +47,11 @@ const upgradeProxy = async (
             // Get contract details
             const contractAddress = await env.addressBook.retrieveContract(contractName, env.network.name)
 
+            // Sanity check on contract address
+            if (!contractAddress) throw new Error(`Contract ${contractName} not found in address book`)
+            
             // Deploy Proxy & initialize it
-            const upgradedContract = await env.upgrades.upgradeProxy(contractAddress, contractInterface)
+            upgradedContract = await env.upgrades.upgradeProxy(contractAddress, contractInterface)
 
             // Get Transaction Receipt
             const upgradedContractTnx = await upgradedContract.deployTransaction.wait()
@@ -64,6 +76,9 @@ const upgradeProxy = async (
             // Console log the address
             console.log('\x1b[32m%s\x1b[0m', `${contractName} upgraded at address: `, upgradedContract.address)
 
+            // Retrieve Proxy Admin Address
+            ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
+
             // Verify the contract
             if (verifyContract) await etherscanVerifyContract(env, upgradedContract.address)
 
@@ -79,7 +94,8 @@ const upgradeProxy = async (
                 // Commit
                 if (isAddedToCommit && lastCommit.success)
                     isCommitted = await commitChanges(
-                        `Deployed ${contractName} from commitId: ${lastCommit.commitId}`,
+                        `💪 ${contractName} upgraded from commitId: ${lastCommit.commitId}`,
+                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${upgradedContract.address}${ProxyAdminAddress ? ', Proxy Admin Address: ' + ProxyAdminAddress : ''}`,
                         filesToCommit
                     )
                 let isPull = false
@@ -95,12 +111,21 @@ const upgradeProxy = async (
 
             // Return the deployed contract and Proxy Admin
             if (logOutput.length > 0) console.table(logOutput)
-
-            // Return the deployed contract
-            return upgradedContract
+        }
+        // Return the upgraded contract
+        return {
+            success: true,
+            message: 'Upgrade successful',
+            contractName,
+            contract:  upgradedContract,
+            proxyAdminAddress: ProxyAdminAddress,
+            proxyAddress: upgradedContract.addressBook
         }
     } catch (err) {
-        console.log(err)
+        return {
+            success: false,
+            message: 'Upgrade failed',
+        }
     }
 }
 

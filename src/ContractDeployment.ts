@@ -19,7 +19,7 @@ export class ContractDeployment {
         skipGit?: boolean,
         verifyContract?: boolean
     ) {
-        await deployProxy(
+        return await deployProxy(
             this._env,
             contractName,
             initializeArguments,
@@ -38,7 +38,7 @@ export class ContractDeployment {
         skipGit?: boolean,
         verifyContract?: boolean
     ) {
-        await upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
+        return await upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
     }
 
     public async testDeployThenUpgradeContract(
@@ -60,6 +60,6 @@ export class ContractDeployment {
             skipGit,
             verifyContract
         )
-        await upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
+        return await upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
     }
 }
