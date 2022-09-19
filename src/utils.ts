@@ -89,10 +89,10 @@ export const getLastCommit = async () => {
     }
 }
 
-export const commitChanges = async (commitComment: string, filesToCommit: string) => {
+export const commitChanges = async (commitComment: string, commitDescription: string, filesToCommit: string) => {
     try {
         // Commit the new storage layout
-        await runCommand('git commit -a -m "Contract-Deployment Utility: ' + commitComment + '"')
+        await runCommand(`git commit -a -m "deployment-tool: ${commitComment}" -m "${commitDescription}"`)
         console.log('\x1b[32m%s\x1b[0m', `Files ${filesToCommit} are Committed in the repo`)
         return true
     } catch (err) {

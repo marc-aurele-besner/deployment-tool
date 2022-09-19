@@ -17,7 +17,14 @@ const deployProxy = async (
     extra?: any,
     skipGit?: boolean,
     verifyContract?: boolean
-) => {
+): Promise<{
+        success: boolean
+        message: string
+        contractName?: string
+        contract?: any
+        proxyAdminAddress?: string
+        proxyAddress?: string
+    }> => {
     try {
         // Set a timeout for the deployment
         let keepWaiting = true
@@ -26,6 +33,8 @@ const deployProxy = async (
         }, 60000)
 
         const logOutput = []
+        let deployedContract: any = null
+        let ProxyAdminAddress: string = ''
 
         while (keepWaiting) {
             // Get deployer account
@@ -38,7 +47,7 @@ const deployProxy = async (
             const contractInterface = await env.ethers.getContractFactory(contractName)
 
             // Deploy Proxy & initialize it
-            const deployedContract = await env.upgrades.deployProxy(contractInterface, initializeArguments, {
+            deployedContract = await env.upgrades.deployProxy(contractInterface, initializeArguments, {
                 initializer: initializeSignature
             })
 
@@ -73,7 +82,7 @@ const deployProxy = async (
             console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.address)
 
             // Retrieve Proxy Admin Address
-            const ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
+            ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
 
             // Save Proxy Admin Address
             env.addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, env.network.name, deployer.address)
@@ -101,7 +110,8 @@ const deployProxy = async (
                 // Commit
                 if (isAddedToCommit && lastCommit.success)
                     isCommitted = await commitChanges(
-                        `Deployed ${contractName} from commitId: ${lastCommit.commitId}`,
+                        `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
+                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${deployedContract.address}, Initialize Arguments: ${JSON.stringify(initializeArguments)}, Initialize Signature: ${initializeSignature}, Proxy Admin Address: ${ProxyAdminAddress}`,
                         filesToCommit
                     )
                 let isPull = false
@@ -117,12 +127,21 @@ const deployProxy = async (
 
             // Return the deployed contract and Proxy Admin
             if (logOutput.length > 0) console.table(logOutput)
-
-            // Return the deployed contract
-            return deployedContract
+        }
+        // Return the deployed contract{
+        return {
+            success: true,
+            message: 'Deployment successful',
+            contractName,
+            contract:  deployedContract,
+            proxyAdminAddress: ProxyAdminAddress,
+            proxyAddress: deployedContract.addressBook
         }
     } catch (err) {
-        console.log(err)
+        return {
+            success: false,
+            message: 'Deployment failed',
+        }
     }
 }
 
