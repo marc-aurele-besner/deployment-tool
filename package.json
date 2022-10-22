@@ -1,6 +1,6 @@
 {
   "name": "deployment-tool",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Tool to deploy and upgrade contracts on Ethereum Mainnet",
   "repository": "https://github.com/marc-aurele-besner/deployment-tool.git",
   "author": "Marc-Aurele Besner <82244926+marc-aurele-besner@users.noreply.github.com>",
