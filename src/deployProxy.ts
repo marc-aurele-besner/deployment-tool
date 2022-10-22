@@ -18,13 +18,13 @@ const deployProxy = async (
     skipGit?: boolean,
     verifyContract?: boolean
 ): Promise<{
-        success: boolean
-        message: string
-        contractName?: string
-        contract?: any
-        proxyAdminAddress?: string
-        proxyAddress?: string
-    }> => {
+    success: boolean
+    message: string
+    contractName?: string
+    contract?: any
+    proxyAdminAddress?: string
+    proxyAddress?: string
+}> => {
     try {
         // Set a timeout for the deployment
         let keepWaiting = true
@@ -111,7 +111,11 @@ const deployProxy = async (
                 if (isAddedToCommit && lastCommit.success)
                     isCommitted = await commitChanges(
                         `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
-                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${deployedContract.address}, Initialize Arguments: ${JSON.stringify(initializeArguments)}, Initialize Signature: ${initializeSignature}, Proxy Admin Address: ${ProxyAdminAddress}`,
+                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${
+                            deployedContract.address
+                        }, Initialize Arguments: ${JSON.stringify(
+                            initializeArguments
+                        )}, Initialize Signature: ${initializeSignature}, Proxy Admin Address: ${ProxyAdminAddress}`,
                         filesToCommit
                     )
                 let isPull = false
@@ -133,14 +137,14 @@ const deployProxy = async (
             success: true,
             message: 'Deployment successful',
             contractName,
-            contract:  deployedContract,
+            contract: deployedContract,
             proxyAdminAddress: ProxyAdminAddress,
             proxyAddress: deployedContract.addressBook
         }
     } catch (err) {
         return {
             success: false,
-            message: 'Deployment failed',
+            message: 'Deployment failed'
         }
     }
 }
