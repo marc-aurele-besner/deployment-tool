@@ -49,7 +49,7 @@ const upgradeProxy = async (
 
             // Sanity check on contract address
             if (!contractAddress) throw new Error(`Contract ${contractName} not found in address book`)
-            
+
             // Deploy Proxy & initialize it
             upgradedContract = await env.upgrades.upgradeProxy(contractAddress, contractInterface)
 
@@ -95,7 +95,9 @@ const upgradeProxy = async (
                 if (isAddedToCommit && lastCommit.success)
                     isCommitted = await commitChanges(
                         `💪 ${contractName} upgraded from commitId: ${lastCommit.commitId}`,
-                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${upgradedContract.address}${ProxyAdminAddress ? ', Proxy Admin Address: ' + ProxyAdminAddress : ''}`,
+                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${
+                            upgradedContract.address
+                        }${ProxyAdminAddress ? ', Proxy Admin Address: ' + ProxyAdminAddress : ''}`,
                         filesToCommit
                     )
                 let isPull = false
@@ -117,14 +119,14 @@ const upgradeProxy = async (
             success: true,
             message: 'Upgrade successful',
             contractName,
-            contract:  upgradedContract,
+            contract: upgradedContract,
             proxyAdminAddress: ProxyAdminAddress,
             proxyAddress: upgradedContract.addressBook
         }
     } catch (err) {
         return {
             success: false,
-            message: 'Upgrade failed',
+            message: 'Upgrade failed'
         }
     }
 }

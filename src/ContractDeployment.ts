@@ -50,7 +50,7 @@ export class ContractDeployment {
         skipGit?: boolean,
         verifyContract?: boolean
     ) {
-        await deployProxy(
+        await await deployProxy(
             this._env,
             contractName,
             initializeArguments,
