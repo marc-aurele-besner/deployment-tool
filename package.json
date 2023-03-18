@@ -61,6 +61,6 @@
   },
   "dependencies": {
     "fs": "^0.0.1-security",
-    "inquirer": "^8.2.5"
+    "inquirer": "^9.0.0"
   }
 }
