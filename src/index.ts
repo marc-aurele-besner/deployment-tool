@@ -72,6 +72,23 @@ task('upgrade-contract', 'Upgrade a proxy contract, save the address, commit, pu
     })
 
 /**
+ * deploy-contract-static task implementation
+ * @param  {HardhatUserArgs} args
+ * @param  {HardhatEnv} env
+ */
+task('deploy-contract-static', 'Deploy a static contract, save the address, commit, pull and push')
+    .addOptionalParam('contractName', 'The name of the contract to deploy', '')
+    .addOptionalParam('constructorArguments', 'The constructor() argument', '')
+    .addOptionalParam('tag', 'Add a extra tag to this version of the contract', '')
+    .addOptionalParam('extra', 'Extra data to save with this deployment', '')
+    .addOptionalParam('skipGit', 'Skit git commit, pull & push', 'false')
+    .addOptionalParam('verifyContract', 'Validate the contract on Etherscan.io', 'false')
+    .setAction(async function (args, env) {
+        // Call function
+        await serveTasks('deploy-contract-static', args, env)
+    })
+
+/**
  * test-deploy-then-upgrade-contract task implementation
  * @param  {HardhatUserArgs} args
  * @param  {HardhatEnv} env

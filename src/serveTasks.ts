@@ -1,5 +1,6 @@
 import inquirer from 'inquirer'
 
+import deploy from './deploy'
 import deployProxy from './deployProxy'
 import upgradeProxy from './upgradeProxy'
 
@@ -21,6 +22,13 @@ const inquirerInitializer = [
         type: 'input',
         name: 'initializeArguments',
         message: 'What is the initialize() argument? (separate multiple arguments with a comma)'
+    }
+]
+const inquirerConstructor = [
+    {
+        type: 'input',
+        name: 'constructorArguments',
+        message: 'What is the constructor() argument? (separate multiple arguments with a comma)'
     }
 ]
 const inquirerExtra = [
@@ -136,6 +144,53 @@ const serveUpgradeTask = async (args: any, env: any) => {
     }
 }
 
+const serveDeployStaticTask = async (args: any, env: any) => {
+    if (!args.contractName || args.contractName === '')
+        await inquirer
+            .prompt([...inquirerContractNameInput, ...inquirerConstructor, ...inquirerExtra])
+            .then(
+                async (answers: {
+                    contractName: string
+                    constructorArguments: string
+                    tag: string
+                    extra: string
+                    skipGit: boolean
+                    verifyContract: boolean
+                }) => {
+                    const constructorArguments = answers.constructorArguments
+                        ? answers.constructorArguments.split(',')
+                        : []
+                    await deploy(
+                        env,
+                        answers.contractName,
+                        constructorArguments,
+                        answers.tag,
+                        answers.extra,
+                        answers.skipGit,
+                        answers.verifyContract
+                    )
+                }
+            )
+            .catch((err: any) => {
+                console.log(err)
+            })
+            .finally(() => {
+                process.exit(0)
+            })
+    else {
+        const constructorArguments = args.constructorArguments ? args.constructorArguments.split(',') : []
+        await deploy(
+            env,
+            args.contractName,
+            constructorArguments,
+            args.tag,
+            args.extra,
+            args.skipGit && args.skipGit === 'true' ? true : false,
+            args.verifyContract && args.verifyContract === 'true' ? true : false
+        )
+    }
+}
+
 const serveTestTask = async (args: any, env: any) => {
     if (!args.contractName || args.contractName === '')
         await inquirer
@@ -222,6 +277,7 @@ const serveFunction = async (task: string, args: any, env: any) => {
     const action = await serveCLI(task)
     if (action === 'deploy-contract') await serveDeployTask(args, env)
     if (action === 'upgrade-contract') await serveUpgradeTask(args, env)
+    if (action === 'deploy-contract-static') await serveDeployStaticTask(args, env)
     if (action === 'test-deploy-then-upgrade-contract') await serveTestTask(args, env)
 }
 

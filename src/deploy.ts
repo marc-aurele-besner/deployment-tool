@@ -8,11 +8,10 @@ import {
     pushToGit
 } from './utils'
 
-const deployProxy = async (
+const deploy = async (
     env: any,
     contractName: string,
-    initializeArguments: any[] = [],
-    initializeSignature: string = 'initialize',
+    constructorArguments: any[] = [],
     tag?: string,
     extra?: any,
     skipGit = false as boolean,
@@ -21,10 +20,10 @@ const deployProxy = async (
 ): Promise<{
     success: boolean
     message: string
+    error?: string
     contractName?: string
     contract?: any
-    proxyAdminAddress?: string
-    proxyAddress?: string
+    address?: string
 }> => {
     try {
         // Set a timeout for the deployment
@@ -35,7 +34,6 @@ const deployProxy = async (
 
         const logOutput = []
         let deployedContract: any = null
-        let ProxyAdminAddress: string = ''
 
         while (keepWaiting) {
             // Get deployer account
@@ -48,18 +46,16 @@ const deployProxy = async (
             const contractInterface = await env.ethers.getContractFactory(contractName)
 
             // Deploy Proxy & initialize it
-            deployedContract = await env.upgrades.deployProxy(contractInterface, initializeArguments, {
-                initializer: initializeSignature
-            })
+            deployedContract = await contractInterface.deploy(constructorArguments)
 
             // Get Transaction Receipt
             const deployedContractTnx = await deployedContract.deployTransaction.wait()
+            await deployedContract.deployed()
 
             // Save deployment arguments
             const extraData = {
                 ...extra,
-                initializeArguments,
-                initializeSignature
+                constructorArguments
             }
 
             // Save the deployment details
@@ -84,24 +80,6 @@ const deployProxy = async (
             // Console log the address
             console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.address)
 
-            try {
-                // Retrieve Proxy Admin Address
-                ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
-
-                // Save Proxy Admin Address
-                env.addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, env.network.name, deployer.address)
-                logOutput.push({
-                    contractName: 'ProxyAdmin',
-                    address: ProxyAdminAddress,
-                    network: env.network.name
-                })
-
-                // Console log the address
-                console.log('Deployed using Proxy Admin contract address: ', ProxyAdminAddress)
-            } catch (error) {
-                console.log('Error retrieving Proxy Admin Address: ', error)
-            }
-
             // Verify the contract
             if (verifyContract) await etherscanVerifyContract(env, deployedContract.address)
 
@@ -120,9 +98,7 @@ const deployProxy = async (
                         `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
                         `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${
                             deployedContract.address
-                        }, Initialize Arguments: ${JSON.stringify(
-                            initializeArguments
-                        )}, Initialize Signature: ${initializeSignature}, Proxy Admin Address: ${ProxyAdminAddress}`,
+                        }, Constructor Arguments: ${JSON.stringify(constructorArguments)}`,
                         filesToCommit
                     )
                 let isPull = false
@@ -145,15 +121,15 @@ const deployProxy = async (
             message: 'Deployment successful',
             contractName,
             contract: deployedContract,
-            proxyAdminAddress: ProxyAdminAddress,
-            proxyAddress: deployedContract.address
+            address: deployedContract.address
         }
     } catch (err) {
         return {
             success: false,
-            message: 'Deployment failed'
+            message: 'Deployment failed',
+            error: err as string
         }
     }
 }
 
-export default deployProxy
+export default deploy

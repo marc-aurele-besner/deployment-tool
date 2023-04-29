@@ -1,5 +1,6 @@
 import { extendEnvironment, task } from 'hardhat/config'
 
+import deploy from './deploy'
 import deployProxy from './deployProxy'
 import upgradeProxy from './upgradeProxy'
 
@@ -19,7 +20,7 @@ export class ContractDeployment {
         skipGit?: boolean,
         verifyContract?: boolean
     ) {
-        return await deployProxy(
+        return deployProxy(
             this._env,
             contractName,
             initializeArguments,
@@ -38,7 +39,7 @@ export class ContractDeployment {
         skipGit?: boolean,
         verifyContract?: boolean
     ) {
-        return await upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
+        return upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
     }
 
     public async testDeployThenUpgradeContract(
@@ -60,6 +61,17 @@ export class ContractDeployment {
             skipGit,
             verifyContract
         )
-        return await upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
+        return upgradeProxy(this._env, contractName, tag, extra, skipGit, verifyContract)
+    }
+
+    public async deployContractStatic(
+        contractName: string,
+        constructorArguments: any[] = [],
+        tag?: string,
+        extra?: any,
+        skipGit?: boolean,
+        verifyContract?: boolean
+    ) {
+        return deploy(this._env, contractName, constructorArguments, tag, extra, skipGit, verifyContract)
     }
 }
