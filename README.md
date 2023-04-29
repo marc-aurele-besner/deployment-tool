@@ -61,13 +61,13 @@ import 'deployment-tool'
  - [.npmignore](./.npmignore)
  - [.prettierignore](./.prettierignore)
  - [.prettierrc](./.prettierrc)
- - [awesome-readme.config.js](./awesome-readme.config.js)
  - [CONTRIBUTING.md](./CONTRIBUTING.md)
  - [LICENSE](./LICENSE)
- - [package-lock.json](./package-lock.json)
- - [package.json](./package.json)
  - [README.md](./README.md)
  - [README3.md](./README3.md)
+ - [awesome-readme.config.js](./awesome-readme.config.js)
+ - [package-lock.json](./package-lock.json)
+ - [package.json](./package.json)
  - [tsconfig.json](./tsconfig.json)
  - [tsconfig.prod.json](./tsconfig.prod.json)
  - [tslint.json](./tslint.json)
@@ -102,6 +102,7 @@ npm link deployment-tool
 npx hardhat deployment
 npx hardhat deploy-contract
 npx hardhat upgrade-contract
+npx hardhat deploy-contract-static
 npx hardhat test-deploy-then-upgrade-contract
 ```
 
@@ -134,6 +135,21 @@ OPTIONS:
 - --verify-contract     Validate the contract on Etherscan.io (default: "false")
 
 upgrade-contract: Upgrade a proxy contract, save the address, commit, pull and push
+
+### Task: deploy-contract-static
+
+Usage: hardhat [GLOBAL OPTIONS] deploy-contract-static [--contract-name <STRING>] [--extra <STRING>] [--constructor-arguments <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]
+
+OPTIONS:
+
+- --contract-name               The name of the contract to deploy (default: "")
+- --extra                       Extra data to save with this deployment (default: "")
+- --constructor-arguments        The constructor() argument (default: "")
+- --skip-git                    Skit git commit, pull & push (default: "false")
+- --tag                         Add a extra tag to this version of the contract (default: "")
+- --verify-contract             Validate the contract on Etherscan.io (default: "false")
+
+deploy-contract-static: Deploy a static contract, save the address, commit, pull and push
 
 ### Task: test-deploy-then-upgrade-contract
 
@@ -192,21 +208,22 @@ deployment-tool/
 │   .npmignore
 │   .prettierignore
 │   .prettierrc
-│   awesome-readme.config.js
 │   CONTRIBUTING.md
 │   LICENSE
-│   package-lock.json
-│   package.json
 │   README.md
 │   README3.md
+│   awesome-readme.config.js
+│   package-lock.json
+│   package.json
 │   tsconfig.json
 │   tsconfig.prod.json
 │   tslint.json
 └─── src/
    │   ContractDeployment.ts
+   │   README.md
+   │   deploy.ts
    │   deployProxy.ts
    │   index.ts
-   │   README.md
    │   serveTasks.ts
    │   type-extensions.ts
    │   upgradeProxy.ts

@@ -1,6 +1,6 @@
 {
   "name": "deployment-tool",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "description": "Tool to deploy and upgrade contracts on Ethereum Mainnet",
   "repository": "https://github.com/marc-aurele-besner/deployment-tool.git",
   "author": "Marc-Aurele Besner <82244926+marc-aurele-besner@users.noreply.github.com>",
@@ -41,10 +41,9 @@
     "@nomiclabs/hardhat-etherscan": "^3.1.5",
     "@openzeppelin/hardhat-upgrades": "^1.22.1",
     "@types/inquirer": "^9.0.3",
-    "@types/node": "^18.11.18",
+    "@types/node": "^18.15.11",
     "awesome-readme": "^0.0.8",
     "hardhat": "^2.12.6",
-    "hardhat-awesome-cli": "^0.1.0",
     "prettier": "^2.8.3",
     "ts-node": "^10.9.1",
     "tslint": "^6.1.3",
@@ -56,11 +55,11 @@
     "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@nomiclabs/hardhat-etherscan": "^3.1.5",
     "@openzeppelin/hardhat-upgrades": "^1.22.1",
-    "hardhat": "^2.12.6",
-    "hardhat-awesome-cli": "^0.0.23 || ^0.1.2"
+    "hardhat": "^2.12.6"
   },
   "dependencies": {
     "fs": "^0.0.1-security",
-    "inquirer": "^9.0.0"
+    "hardhat-awesome-cli": "^0.1.4",
+    "inquirer": "^8.2.5"
   }
 }

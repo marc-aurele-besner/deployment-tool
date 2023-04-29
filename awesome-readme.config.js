@@ -78,6 +78,7 @@ npm link deployment-tool
 npx hardhat deployment
 npx hardhat deploy-contract
 npx hardhat upgrade-contract
+npx hardhat deploy-contract-static
 npx hardhat test-deploy-then-upgrade-contract
 \`\`\`
 
@@ -110,6 +111,21 @@ OPTIONS:
 - --verify-contract     Validate the contract on Etherscan.io (default: "false")
 
 upgrade-contract: Upgrade a proxy contract, save the address, commit, pull and push
+
+### Task: deploy-contract-static
+
+Usage: hardhat [GLOBAL OPTIONS] deploy-contract-static [--contract-name <STRING>] [--extra <STRING>] [--constructor-arguments <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]
+
+OPTIONS:
+
+- --contract-name               The name of the contract to deploy (default: "")
+- --extra                       Extra data to save with this deployment (default: "")
+- --constructor-arguments        The constructor() argument (default: "")
+- --skip-git                    Skit git commit, pull & push (default: "false")
+- --tag                         Add a extra tag to this version of the contract (default: "")
+- --verify-contract             Validate the contract on Etherscan.io (default: "false")
+
+deploy-contract-static: Deploy a static contract, save the address, commit, pull and push
 
 ### Task: test-deploy-then-upgrade-contract
 
