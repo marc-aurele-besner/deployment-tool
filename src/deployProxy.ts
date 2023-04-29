@@ -15,8 +15,9 @@ const deployProxy = async (
     initializeSignature: string = 'initialize',
     tag?: string,
     extra?: any,
-    skipGit?: boolean,
-    verifyContract?: boolean
+    skipGit = false as boolean,
+    verifyContract = true as boolean,
+    forceSave = false as boolean
 ): Promise<{
     success: boolean
     message: string
@@ -67,10 +68,12 @@ const deployProxy = async (
                 deployedContract.address,
                 env.network.name,
                 deployer.address,
+                env.network.config.chainId,
                 deployedContractTnx.blockHash,
                 deployedContractTnx.blockNumber,
                 tag,
-                extraData
+                extraData,
+                forceSave
             )
             logOutput.push({
                 contractName,
@@ -81,19 +84,23 @@ const deployProxy = async (
             // Console log the address
             console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.address)
 
-            // Retrieve Proxy Admin Address
-            ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
+            try {
+                // Retrieve Proxy Admin Address
+                ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
 
-            // Save Proxy Admin Address
-            env.addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, env.network.name, deployer.address)
-            logOutput.push({
-                contractName: 'ProxyAdmin',
-                address: ProxyAdminAddress,
-                network: env.network.name
-            })
+                // Save Proxy Admin Address
+                env.addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, env.network.name, deployer.address)
+                logOutput.push({
+                    contractName: 'ProxyAdmin',
+                    address: ProxyAdminAddress,
+                    network: env.network.name
+                })
 
-            // Console log the address
-            console.log('Deployed using Proxy Admin contract address: ', ProxyAdminAddress)
+                // Console log the address
+                console.log('Deployed using Proxy Admin contract address: ', ProxyAdminAddress)
+            } catch (error) {
+                console.log('Error retrieving Proxy Admin Address: ', error)
+            }
 
             // Verify the contract
             if (verifyContract) await etherscanVerifyContract(env, deployedContract.address)
@@ -139,7 +146,7 @@ const deployProxy = async (
             contractName,
             contract: deployedContract,
             proxyAdminAddress: ProxyAdminAddress,
-            proxyAddress: deployedContract.addressBook
+            proxyAddress: deployedContract.address
         }
     } catch (err) {
         return {
