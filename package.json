@@ -60,6 +60,6 @@
   "dependencies": {
     "fs": "^0.0.1-security",
     "hardhat-awesome-cli": "^0.1.4",
-    "inquirer": "^8.2.5"
+    "inquirer": "^9.0.0"
   }
 }
