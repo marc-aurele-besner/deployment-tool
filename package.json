@@ -41,7 +41,7 @@
     "@nomiclabs/hardhat-etherscan": "^3.1.5",
     "@openzeppelin/hardhat-upgrades": "^1.22.1",
     "@types/inquirer": "^9.0.3",
-    "@types/node": "^18.15.11",
+    "@types/node": "^20.0.0",
     "awesome-readme": "^0.0.8",
     "hardhat": "^2.12.6",
     "prettier": "^2.8.3",
