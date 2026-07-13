@@ -1,2 +1,8 @@
 test
+test/**
+contracts/
+hardhat.config.ts
+.cache/
+artifacts/
+typechain-types/
 .github
