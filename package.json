@@ -34,7 +34,9 @@
     "lint": "tslint --config tslint.json --project tsconfig.json",
     "prepublishOnly": "tsc --project tsconfig.prod.json",
     "build": "npx awesome-readme && tsc --project tsconfig.prod.json",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "test": "hardhat test",
+    "compile": "hardhat compile"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.2",
@@ -43,7 +45,9 @@
     "@types/inquirer": "^9.0.3",
     "@types/node": "^20.0.0",
     "awesome-readme": "^0.0.8",
+    "chai": "^4.3.7",
     "hardhat": "^2.12.6",
+    "mocha": "^10.2.0",
     "prettier": "^2.8.3",
     "ts-node": "^10.9.1",
     "tslint": "^6.1.3",
