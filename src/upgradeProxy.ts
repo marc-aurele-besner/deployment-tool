@@ -121,7 +121,7 @@ const upgradeProxy = async (
             contractName,
             contract: upgradedContract,
             proxyAdminAddress: ProxyAdminAddress,
-            proxyAddress: upgradedContract.addressBook
+            proxyAddress: upgradedContract.address
         }
     } catch (err) {
         return {
