@@ -37,3 +37,8 @@ typings/
 
 # hardhat-project
 dist/
+
+# Hardhat build outputs (test fixtures + cache)
+artifacts/
+cache/
+typechain-types/

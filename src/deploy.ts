@@ -45,8 +45,9 @@ const deploy = async (
             // Get Interface
             const contractInterface = await env.ethers.getContractFactory(contractName)
 
-            // Deploy Proxy & initialize it
-            deployedContract = await contractInterface.deploy(constructorArguments)
+            // Deploy the contract. `constructorArguments` is an array; ethers'
+            // ContractFactory.deploy is variadic, so we must spread it.
+            deployedContract = await contractInterface.deploy(...constructorArguments)
 
             // Get Transaction Receipt
             const deployedContractTnx = await deployedContract.deployTransaction.wait()
