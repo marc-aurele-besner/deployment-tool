@@ -42,7 +42,6 @@
     "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@nomiclabs/hardhat-etherscan": "^3.1.5",
     "@openzeppelin/hardhat-upgrades": "^1.22.1",
-    "@types/inquirer": "^9.0.3",
     "@types/node": "^20.0.0",
     "awesome-readme": "^0.0.8",
     "chai": "^4.3.7",
@@ -64,6 +63,6 @@
   "dependencies": {
     "fs": "^0.0.1-security",
     "hardhat-awesome-cli": "^0.1.4",
-    "inquirer": "^10.0.0"
+    "inquirer": "^12.0.0"
   }
 }
