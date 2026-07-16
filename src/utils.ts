@@ -1,6 +1,5 @@
 import { spawn } from 'child_process'
 import fs from 'fs'
-import { exit } from 'process'
 
 const sleep = async (ms: number) => {
     return new Promise((resolve) => setTimeout(resolve, ms))
@@ -13,7 +12,7 @@ export const runCommand = async (command: string) => {
             stdio: 'inherit',
             shell: true
         })
-        runPush.on('exit', (code) => {
+        runPush.on('exit', (_code) => {
             // exit()
             finishedRunning = true
         })

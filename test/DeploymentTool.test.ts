@@ -1,6 +1,6 @@
 import { strict as assert } from 'assert'
+import hre from 'hardhat'
 import { ethers, network } from 'hardhat'
-import type { HardhatRuntimeEnvironment } from 'hardhat/types'
 
 /**
  * In-memory replacement for `hardhat-awesome-cli`'s `AwesomeAddressBook`.
@@ -65,14 +65,12 @@ class InMemoryAddressBook {
 }
 
 describe('deployment-tool plugin', function () {
-    let hre: HardhatRuntimeEnvironment
     let book: InMemoryAddressBook
 
     // The OZ plugin + compile + on-chain deploys take a few seconds.
     this.timeout(120_000)
 
     beforeEach(function () {
-        hre = require('hardhat')
         book = new InMemoryAddressBook()
         // Monkey-patch the runtime so the plugin reads/writes our stub.
         ;(hre as any).addressBook = book

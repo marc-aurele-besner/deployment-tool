@@ -123,7 +123,7 @@ const upgradeProxy = async (
             proxyAdminAddress: ProxyAdminAddress,
             proxyAddress: upgradedContract.address
         }
-    } catch (err) {
+    } catch {
         return {
             success: false,
             message: 'Upgrade failed'

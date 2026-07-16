@@ -1,5 +1,3 @@
-import { extendEnvironment, task } from 'hardhat/config'
-
 import deploy from './deploy'
 import deployProxy from './deployProxy'
 import upgradeProxy from './upgradeProxy'
