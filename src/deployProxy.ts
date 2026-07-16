@@ -148,7 +148,7 @@ const deployProxy = async (
             proxyAdminAddress: ProxyAdminAddress,
             proxyAddress: deployedContract.address
         }
-    } catch (err) {
+    } catch {
         return {
             success: false,
             message: 'Deployment failed'

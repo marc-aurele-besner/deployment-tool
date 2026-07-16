@@ -55,9 +55,8 @@ import 'deployment-tool'
 ```
     
 ## Directories
- - [src/](./src/)
+ - [contracts/](./contracts/) - [src/](./src/)
 
- - [.eslintrc.js](./.eslintrc.js)
  - [.npmignore](./.npmignore)
  - [.prettierignore](./.prettierignore)
  - [.prettierrc](./.prettierrc)
@@ -66,11 +65,12 @@ import 'deployment-tool'
  - [README.md](./README.md)
  - [README3.md](./README3.md)
  - [awesome-readme.config.js](./awesome-readme.config.js)
+ - [eslint.config.mjs](./eslint.config.mjs)
+ - [hardhat.config.ts](./hardhat.config.ts)
  - [package-lock.json](./package-lock.json)
  - [package.json](./package.json)
  - [tsconfig.json](./tsconfig.json)
  - [tsconfig.prod.json](./tsconfig.prod.json)
- - [tslint.json](./tslint.json)
 
 
 ### Other option
@@ -204,7 +204,6 @@ Function allow you to use the deployment OR upgrade script in scripts or tests f
 ## Directory Tree
 ```
 deployment-tool/
-│   .eslintrc.js
 │   .npmignore
 │   .prettierignore
 │   .prettierrc
@@ -213,12 +212,18 @@ deployment-tool/
 │   README.md
 │   README3.md
 │   awesome-readme.config.js
+│   eslint.config.mjs
+│   hardhat.config.ts
 │   package-lock.json
 │   package.json
 │   tsconfig.json
 │   tsconfig.prod.json
-│   tslint.json
+└─── contracts/
 └─── src/
+   │   GreeterV1.sol
+   │   GreeterV2.sol
+   │   README.md
+   │   StaticBox.sol
    │   ContractDeployment.ts
    │   README.md
    │   deploy.ts
