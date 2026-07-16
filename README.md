@@ -54,15 +54,12 @@ or inside hardhat.config.ts (Typescript)
 import 'deployment-tool'
 ```
     
-## Directories
- - [contracts/](./contracts/) - [src/](./src/)
 
  - [.npmignore](./.npmignore)
  - [.prettierignore](./.prettierignore)
  - [.prettierrc](./.prettierrc)
  - [CONTRIBUTING.md](./CONTRIBUTING.md)
  - [LICENSE](./LICENSE)
- - [README.md](./README.md)
  - [README3.md](./README3.md)
  - [awesome-readme.config.js](./awesome-readme.config.js)
  - [eslint.config.mjs](./eslint.config.mjs)
@@ -209,7 +206,6 @@ deployment-tool/
 │   .prettierrc
 │   CONTRIBUTING.md
 │   LICENSE
-│   README.md
 │   README3.md
 │   awesome-readme.config.js
 │   eslint.config.mjs
@@ -218,21 +214,6 @@ deployment-tool/
 │   package.json
 │   tsconfig.json
 │   tsconfig.prod.json
-└─── contracts/
-└─── src/
-   │   GreeterV1.sol
-   │   GreeterV2.sol
-   │   README.md
-   │   StaticBox.sol
-   │   ContractDeployment.ts
-   │   README.md
-   │   deploy.ts
-   │   deployProxy.ts
-   │   index.ts
-   │   serveTasks.ts
-   │   type-extensions.ts
-   │   upgradeProxy.ts
-   │   utils.ts
 ```
 
 ### Dependencies
