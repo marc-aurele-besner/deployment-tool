@@ -1,3 +1,4 @@
+import '@nomicfoundation/hardhat-verify'
 import '@nomiclabs/hardhat-ethers'
 import '@openzeppelin/hardhat-upgrades'
 import 'hardhat-awesome-cli'
