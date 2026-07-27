@@ -50,7 +50,7 @@
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
     "awesome-readme": "^0.0.8",
-    "chai": "^5.3.3",
+    "chai": "^6.0.0",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
