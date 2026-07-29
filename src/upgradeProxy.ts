@@ -6,15 +6,21 @@ import {
     getLastCommit,
     pullFromGit,
     pushToGit
-} from './utils'
+} from './utils.js'
 
-const upgradeProxy = async (
-    env: any,
+import { upgrades as upgradesFactory } from '@openzeppelin/hardhat-upgrades'
+import type { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
+import type { NetworkConnection } from 'hardhat/types/network'
+
+export const upgradeProxy = async (
+    connection: NetworkConnection,
+    addressBook: AwesomeAddressBook,
+    hre: any,
     contractName: string,
     tag?: string,
     extra?: any,
     skipGit?: boolean,
-    verifyContract?: boolean
+    verifyContractFlag?: boolean
 ): Promise<{
     success: boolean
     message: string
@@ -24,110 +30,89 @@ const upgradeProxy = async (
     proxyAddress?: string
 }> => {
     try {
-        // Set a timeout for the deployment
-        let keepWaiting = true
-        setTimeout(() => {
-            keepWaiting = false
-        }, 60000)
-
-        const logOutput = []
+        const logOutput: Array<{ contractName: string; address: string; network: string }> = []
         let upgradedContract: any = null
         let ProxyAdminAddress: string = ''
 
-        while (keepWaiting) {
-            // Get deployer account
-            const [deployer] = await env.ethers.getSigners()
+        await compileContract(connection, hre)
 
-            // Make sure contract is compiled
-            await compileContract(env)
+        const [deployer] = await connection.ethers.getSigners()
+        const contractInterface = await connection.ethers.getContractFactory(contractName)
 
-            // Get Interface
-            const contractInterface = await env.ethers.getContractFactory(contractName)
+        const contractAddress = addressBook.retrieveContract(contractName, connection.networkName)
+        if (!contractAddress) throw new Error(`Contract ${contractName} not found in address book`)
 
-            // Get contract details
-            const contractAddress = await env.addressBook.retrieveContract(contractName, env.network.name)
+        const upgrades = await upgradesFactory(hre, connection)
+        upgradedContract = await upgrades.upgradeProxy(contractAddress, contractInterface)
 
-            // Sanity check on contract address
-            if (!contractAddress) throw new Error(`Contract ${contractName} not found in address book`)
+        // For an upgrade the relevant receipt is the implementation
+        // deployment tx; falls back to no-op data when OZ hands us the
+        // already-deployed proxy instance (where `deploymentTransaction`
+        // resolves to `null`).
+        const implTx = upgradedContract.deploymentTransaction() as any
+        const upgradedContractTnx = implTx ? await implTx.wait() : { blockHash: '', blockNumber: 0 }
 
-            // Deploy Proxy & initialize it
-            upgradedContract = await env.upgrades.upgradeProxy(contractAddress, contractInterface)
+        addressBook.saveContract(
+            contractName,
+            upgradedContract.target as string,
+            connection.networkName,
+            deployer.address,
+            connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0,
+            upgradedContractTnx.blockHash,
+            upgradedContractTnx.blockNumber,
+            tag,
+            extra
+        )
+        logOutput.push({
+            contractName,
+            address: upgradedContract.target as string,
+            network: connection.networkName
+        })
 
-            // Get Transaction Receipt
-            const upgradedContractTnx = await upgradedContract.deployTransaction.wait()
+        console.log('\x1b[32m%s\x1b[0m', `${contractName} upgraded at address: `, upgradedContract.target as string)
 
-            // Save the deployment details
-            await env.addressBook.saveContract(
-                contractName,
-                upgradedContract.address,
-                env.network.name,
-                deployer.address,
-                upgradedContractTnx.blockHash,
-                upgradedContractTnx.blockNumber,
-                tag,
-                extra
-            )
-            logOutput.push({
-                contractName,
-                address: upgradedContract.address,
-                network: env.network.name
-            })
+        ProxyAdminAddress = addressBook.retrieveOZAdminProxyContract(
+            connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0
+        )
 
-            // Console log the address
-            console.log('\x1b[32m%s\x1b[0m', `${contractName} upgraded at address: `, upgradedContract.address)
+        if (verifyContractFlag) await etherscanVerifyContract(hre, upgradedContract.target as string)
 
-            // Retrieve Proxy Admin Address
-            ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
+        if (!skipGit) {
+            const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
+            const isAddedToCommit = await addToCommit(filesToCommit)
+            let isCommitted = false
+            const lastCommit = await getLastCommit()
 
-            // Verify the contract
-            if (verifyContract) await etherscanVerifyContract(env, upgradedContract.address)
+            if (isAddedToCommit && lastCommit.success)
+                isCommitted = await commitChanges(
+                    `💪 ${contractName} upgraded from commitId: ${lastCommit.commitId}`,
+                    `Network: ${connection.networkName}, Deployer: ${deployer.address}, Contract Address: ${
+                        upgradedContract.target as string
+                    }${ProxyAdminAddress ? ', Proxy Admin Address: ' + ProxyAdminAddress : ''}`,
+                    filesToCommit
+                )
+            let isPull = false
+            if (isCommitted) isPull = await pullFromGit()
+            if (isPull) await pushToGit(filesToCommit)
+        } else console.log('Skipping git commit, pull & push')
 
-            if (!skipGit) {
-                // Add the contract address files and contract storage layout to the next commit
-                const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
-                const isAddedToCommit = await addToCommit(filesToCommit)
-                let isCommitted = false
+        if (logOutput.length > 0) console.table(logOutput)
 
-                // Get last CommitId
-                const lastCommit = await getLastCommit()
-
-                // Commit
-                if (isAddedToCommit && lastCommit.success)
-                    isCommitted = await commitChanges(
-                        `💪 ${contractName} upgraded from commitId: ${lastCommit.commitId}`,
-                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${
-                            upgradedContract.address
-                        }${ProxyAdminAddress ? ', Proxy Admin Address: ' + ProxyAdminAddress : ''}`,
-                        filesToCommit
-                    )
-                let isPull = false
-
-                // Pull
-                if (isCommitted) isPull = await pullFromGit()
-
-                // Push
-                if (isPull) await pushToGit(filesToCommit)
-            } else console.log('Skipping git commit, pull & push')
-            // Exit
-            keepWaiting = false
-
-            // Return the deployed contract and Proxy Admin
-            if (logOutput.length > 0) console.table(logOutput)
-        }
-        // Return the upgraded contract
         return {
             success: true,
             message: 'Upgrade successful',
             contractName,
             contract: upgradedContract,
             proxyAdminAddress: ProxyAdminAddress,
-            proxyAddress: upgradedContract.address
+            proxyAddress: upgradedContract.target as string
         }
-    } catch {
+    } catch (err) {
+        console.error('upgradeProxy error:', err)
         return {
             success: false,
-            message: 'Upgrade failed'
-        }
+            message: 'Upgrade failed',
+            error: (err as Error)?.message ?? String(err)
+        } as any
     }
 }
 

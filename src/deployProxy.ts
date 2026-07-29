@@ -6,17 +6,23 @@ import {
     getLastCommit,
     pullFromGit,
     pushToGit
-} from './utils'
+} from './utils.js'
 
-const deployProxy = async (
-    env: any,
+import { upgrades as upgradesFactory } from '@openzeppelin/hardhat-upgrades'
+import type { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
+import type { NetworkConnection } from 'hardhat/types/network'
+
+export const deployProxy = async (
+    connection: NetworkConnection,
+    addressBook: AwesomeAddressBook,
+    hre: any,
     contractName: string,
     initializeArguments: any[] = [],
     initializeSignature: string = 'initialize',
     tag?: string,
     extra?: any,
     skipGit = false as boolean,
-    verifyContract = true as boolean,
+    verifyContractFlag = true as boolean,
     forceSave = false as boolean
 ): Promise<{
     success: boolean
@@ -27,132 +33,118 @@ const deployProxy = async (
     proxyAddress?: string
 }> => {
     try {
-        // Set a timeout for the deployment
-        let keepWaiting = true
-        setTimeout(() => {
-            keepWaiting = false
-        }, 60000)
-
-        const logOutput = []
+        const logOutput: Array<{ contractName: string; address: string; network: string }> = []
         let deployedContract: any = null
         let ProxyAdminAddress: string = ''
 
-        while (keepWaiting) {
-            // Get deployer account
-            const [deployer] = await env.ethers.getSigners()
+        // Build contracts.
+        await compileContract(connection, hre)
 
-            // Make sure contract is compiled
-            await compileContract(env)
+        // Get deployer account.
+        const [deployer] = await connection.ethers.getSigners()
 
-            // Get Interface
-            const contractInterface = await env.ethers.getContractFactory(contractName)
+        // Get factory.
+        const contractInterface = await connection.ethers.getContractFactory(contractName)
 
-            // Deploy Proxy & initialize it
-            deployedContract = await env.upgrades.deployProxy(contractInterface, initializeArguments, {
-                initializer: initializeSignature
-            })
+        // OpenZeppelin upgrades API takes (hre, connection) in v4 (instead of
+        // the old `hre.upgrades` singleton) and returns a per-connection
+        // upgrades object containing `deployProxy`.
+        const upgrades = await upgradesFactory(hre, connection)
 
-            // Get Transaction Receipt
-            const deployedContractTnx = await deployedContract.deployTransaction.wait()
+        // Deploy proxy & initialize it.
+        deployedContract = await upgrades.deployProxy(contractInterface, initializeArguments, {
+            initializer: initializeSignature
+        } as any)
 
-            // Save deployment arguments
-            const extraData = {
-                ...extra,
-                initializeArguments,
-                initializeSignature
-            }
+        // Hardhat 3 / OZ upgrades v4 normalizes the returned proxy to an ethers v6
+        // contract instance whose deployment transaction is exposed via the
+        // `deploymentTransaction()` method (the v2 `deployTransaction` property
+        // is gone — `instance.deployTransaction` is undefined).
+        const deployedContractTnx = await (deployedContract.deploymentTransaction() as any).wait()
 
-            // Save the deployment details
-            await env.addressBook.saveContract(
-                contractName,
-                deployedContract.address,
-                env.network.name,
-                deployer.address,
-                env.network.config.chainId,
-                deployedContractTnx.blockHash,
-                deployedContractTnx.blockNumber,
-                tag,
-                extraData,
-                forceSave
-            )
-            logOutput.push({
-                contractName,
-                address: deployedContract.address,
-                network: env.network.name
-            })
-
-            // Console log the address
-            console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.address)
-
-            try {
-                // Retrieve Proxy Admin Address
-                ProxyAdminAddress = await env.addressBook.retrieveOZAdminProxyContract(env.network.config.chainId)
-
-                // Save Proxy Admin Address
-                env.addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, env.network.name, deployer.address)
-                logOutput.push({
-                    contractName: 'ProxyAdmin',
-                    address: ProxyAdminAddress,
-                    network: env.network.name
-                })
-
-                // Console log the address
-                console.log('Deployed using Proxy Admin contract address: ', ProxyAdminAddress)
-            } catch (error) {
-                console.log('Error retrieving Proxy Admin Address: ', error)
-            }
-
-            // Verify the contract
-            if (verifyContract) await etherscanVerifyContract(env, deployedContract.address)
-
-            if (!skipGit) {
-                // Add the contract address files and contract storage layout to the next commit
-                const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
-                const isAddedToCommit = await addToCommit(filesToCommit)
-                let isCommitted = false
-
-                // Get last CommitId
-                const lastCommit = await getLastCommit()
-
-                // Commit
-                if (isAddedToCommit && lastCommit.success)
-                    isCommitted = await commitChanges(
-                        `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
-                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${
-                            deployedContract.address
-                        }, Initialize Arguments: ${JSON.stringify(
-                            initializeArguments
-                        )}, Initialize Signature: ${initializeSignature}, Proxy Admin Address: ${ProxyAdminAddress}`,
-                        filesToCommit
-                    )
-                let isPull = false
-
-                // Pull
-                if (isCommitted) isPull = await pullFromGit()
-
-                // Push
-                if (isPull) await pushToGit(filesToCommit)
-            } else console.log('Skipping git commit, pull & push')
-            // Exit
-            keepWaiting = false
-
-            // Return the deployed contract and Proxy Admin
-            if (logOutput.length > 0) console.table(logOutput)
+        // Save deployment arguments.
+        const extraData = {
+            ...extra,
+            initializeArguments,
+            initializeSignature
         }
-        // Return the deployed contract{
+
+        // Save the deployment details.
+        addressBook.saveContract(
+            contractName,
+            deployedContract.target as string,
+            connection.networkName,
+            deployer.address,
+            connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0,
+            deployedContractTnx.blockHash,
+            deployedContractTnx.blockNumber,
+            tag,
+            extraData,
+            forceSave
+        )
+        logOutput.push({
+            contractName,
+            address: deployedContract.target as string,
+            network: connection.networkName
+        })
+
+        console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.target as string)
+
+        try {
+            ProxyAdminAddress = addressBook.retrieveOZAdminProxyContract(
+                connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0
+            )
+            addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, connection.networkName, deployer.address)
+            logOutput.push({
+                contractName: 'ProxyAdmin',
+                address: ProxyAdminAddress,
+                network: connection.networkName
+            })
+            console.log('Deployed using Proxy Admin contract address: ', ProxyAdminAddress)
+        } catch (error) {
+            console.log('Error retrieving Proxy Admin Address: ', error)
+        }
+
+        if (verifyContractFlag) await etherscanVerifyContract(hre, deployedContract.target as string)
+
+        if (!skipGit) {
+            const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
+            const isAddedToCommit = await addToCommit(filesToCommit)
+            let isCommitted = false
+            const lastCommit = await getLastCommit()
+
+            if (isAddedToCommit && lastCommit.success)
+                isCommitted = await commitChanges(
+                    `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
+                    `Network: ${connection.networkName}, Deployer: ${deployer.address}, Contract Address: ${
+                        deployedContract.target as string
+                    }, Initialize Arguments: ${JSON.stringify(
+                        initializeArguments
+                    )}, Initialize Signature: ${initializeSignature}, Proxy Admin Address: ${ProxyAdminAddress}`,
+                    filesToCommit
+                )
+            let isPull = false
+            if (isCommitted) isPull = await pullFromGit()
+            if (isPull) await pushToGit(filesToCommit)
+        } else console.log('Skipping git commit, pull & push')
+
+        if (logOutput.length > 0) console.table(logOutput)
+
         return {
             success: true,
             message: 'Deployment successful',
             contractName,
             contract: deployedContract,
             proxyAdminAddress: ProxyAdminAddress,
-            proxyAddress: deployedContract.address
+            proxyAddress: deployedContract.target as string
         }
-    } catch {
+    } catch (err) {
+        console.error('deployProxy error:', err)
         return {
             success: false,
-            message: 'Deployment failed'
-        }
+            message: 'Deployment failed',
+            error: (err as Error)?.message ?? String(err)
+        } as any
     }
 }
 
