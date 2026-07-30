@@ -7,6 +7,8 @@ import { task } from 'hardhat/config'
 
 import './type-extensions.js'
 
+export { ContractDeployment, createContractDeployment } from './lib.js'
+
 /**
  * Hardhat 3 config hook that resolves `paths.deployment` from the user
  * config into the resolved config. This replaces the `extendConfig`
