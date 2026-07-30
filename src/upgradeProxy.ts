@@ -87,7 +87,25 @@ export const upgradeProxy = async (
             }
         }
 
-        if (verifyContractFlag) await etherscanVerifyContract(hre, upgradedContract.target as string)
+        // Verify the contracts on Etherscan. For an upgraded proxy the
+        // proxy address is unchanged but the implementation contract behind
+        // it has been replaced — verify both so block explorers reflect the
+        // new logic.
+        if (verifyContractFlag) {
+            await etherscanVerifyContract(hre, upgradedContract.target as string)
+            try {
+                const implementationAddress = await upgrades.erc1967.getImplementationAddress(
+                    upgradedContract.target as string
+                )
+                if (implementationAddress) {
+                    await etherscanVerifyContract(hre, implementationAddress)
+                } else {
+                    console.log('Warning: could not resolve implementation address for verification')
+                }
+            } catch (error) {
+                console.log('Error retrieving implementation address for verification: ', error)
+            }
+        }
 
         if (!skipGit) {
             const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`

@@ -118,7 +118,26 @@ export const deployProxy = async (
             console.log('Warning: could not determine Proxy Admin contract address')
         }
 
-        if (verifyContractFlag) await etherscanVerifyContract(hre, deployedContract.target as string)
+        // Verify the contracts on Etherscan. For an upgradeable proxy the
+        // proxy address alone is opaque on block explorers — the actual
+        // logic lives in the implementation contract behind it, so we
+        // resolve the implementation via the ERC-1967 slot and verify that
+        // (in addition to the proxy itself).
+        if (verifyContractFlag) {
+            await etherscanVerifyContract(hre, deployedContract.target as string)
+            try {
+                const implementationAddress = await upgrades.erc1967.getImplementationAddress(
+                    deployedContract.target as string
+                )
+                if (implementationAddress) {
+                    await etherscanVerifyContract(hre, implementationAddress)
+                } else {
+                    console.log('Warning: could not resolve implementation address for verification')
+                }
+            } catch (error) {
+                console.log('Error retrieving implementation address for verification: ', error)
+            }
+        }
 
         if (!skipGit) {
             const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
