@@ -22,6 +22,42 @@ npm run build
 
 4. Increase the version numbers in package.json to the new version that this Pull Request would represent. The versioning scheme we use is [SemVer](http://semver.org/).
 
+## Continuous Integration
+
+Every push and pull request against `main` and `dev` runs `.github/workflows/test.yml`:
+
+- **Lint, format & build** — `npm run format:check`, `npm run lint`, `npm run build`
+- **Plugin tests** — `npm run compile` and `npm test` on Node 22 and 24 (Hardhat 3 requires Node >= 22.13.0)
+- **Package smoke test** — `npm pack`, then installs the tarball into a clean consumer project and imports the plugin to catch broken `dist/` output or a bad `files`/`exports` config
+
+You can reproduce all of it locally with `npm run format:check && npm run lint && npm run build && npm test`.
+
+### TypeScript 6 / 7 side-by-side
+
+`tsc` runs TypeScript 7, but `typescript-eslint` does not support the TS 7 API yet, so
+`package.json` uses the [officially documented aliases](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/):
+
+```json
+"@typescript/native": "npm:typescript@^7.0.2",
+"typescript": "npm:@typescript/typescript6@^6.0.2"
+```
+
+`typescript` resolves to the TS 6 API that ESLint needs, while `npx tsc` still runs TS 7.
+Please keep both entries in place until `typescript-eslint` ships TS 7 support
+([typescript-eslint#10940](https://github.com/typescript-eslint/typescript-eslint/issues/10940)).
+
+## Releasing
+
+Publishing is automated by `.github/workflows/publish.yml` and requires an `NPM_TOKEN` repository secret.
+
+1. Bump `version` in `package.json` and merge that change into `main`.
+2. Create a GitHub Release whose tag matches the version (`v0.2.0` or `0.2.0`).
+3. The workflow re-runs format, lint, build, compile and tests, verifies the tag matches
+   `package.json`, then publishes to npm with `--provenance --access public`.
+
+A mismatched tag fails the run before anything is published. You can also trigger the workflow
+manually via **Run workflow**; it defaults to a dry run that packs and validates without publishing.
+
 ## Code of Conduct
 
 ### Our Pledge
