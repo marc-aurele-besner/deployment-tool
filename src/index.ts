@@ -75,8 +75,7 @@ const upgradeContractTask = task(
     })
     .addOption({
         name: 'from',
-        description:
-            'Name of the previous contract version whose address-book entry holds the proxy to upgrade',
+        description: 'Name of the previous contract version whose address-book entry holds the proxy to upgrade',
         defaultValue: ''
     })
     .addOption({ name: 'tag', description: 'Add an extra tag to this version of the contract', defaultValue: '' })
@@ -118,8 +117,7 @@ const testDeployThenUpgradeTask = task(
     })
     .addOption({
         name: 'from',
-        description:
-            'Name of the previous contract version whose address-book entry holds the proxy to upgrade',
+        description: 'Name of the previous contract version whose address-book entry holds the proxy to upgrade',
         defaultValue: ''
     })
     .addOption({ name: 'tag', description: 'Add an extra tag to this version of the contract', defaultValue: '' })

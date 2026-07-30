@@ -303,10 +303,7 @@ describe('deployment-tool plugin', function () {
 
             // The upgrade must save the new name (GreeterV2) under the
             // same proxy address so subsequent lookups succeed.
-            assert.equal(
-                book.book.retrieveContract('GreeterV2', connection.networkName),
-                proxyAddress
-            )
+            assert.equal(book.book.retrieveContract('GreeterV2', connection.networkName), proxyAddress)
 
             const GreeterV2 = await connection.ethers.getContractFactory('GreeterV2')
             const proxied = GreeterV2.attach(proxyAddress)
@@ -332,14 +329,7 @@ describe('deployment-tool plugin', function () {
             // succeed via the explicit proxy address.
             book.book.saveContract('GreeterV2', '', connection.networkName, '')
 
-            const upgraded = await cd.upgradeContract(
-                'GreeterV2',
-                undefined,
-                undefined,
-                true,
-                false,
-                proxyAddress
-            )
+            const upgraded = await cd.upgradeContract('GreeterV2', undefined, undefined, true, false, proxyAddress)
             assert.equal(upgraded.success, true)
             assert.equal(upgraded.proxyAddress, proxyAddress)
             assert.equal(upgraded.contractName, 'GreeterV2')
