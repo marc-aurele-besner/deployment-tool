@@ -1,22 +1,21 @@
 import { spawn } from 'child_process'
 import fs from 'fs'
+import type { NetworkConnection } from 'hardhat/types/network'
 
-const sleep = async (ms: number) => {
-    return new Promise((resolve) => setTimeout(resolve, ms))
-}
+import { verifyContract } from '@nomicfoundation/hardhat-verify/verify'
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export const runCommand = async (command: string) => {
     try {
         let finishedRunning = false
-        const runPush = await spawn(command, {
+        const runPush = spawn(command, {
             stdio: 'inherit',
             shell: true
         })
         runPush.on('exit', (_code) => {
-            // exit()
             finishedRunning = true
         })
-        // Keep waiting until the compiling is finished
         while (!finishedRunning) {
             await sleep(500)
         }
@@ -27,24 +26,36 @@ export const runCommand = async (command: string) => {
     }
 }
 
-export const compileContract = async (env: any) => {
+/**
+ * Build the Solidity contracts through the supplied HRE.
+ * In Hardhat 3 the compile pipeline is exposed as the `build` task; there is
+ * no longer a `compile` task / `env.run('compile')` shortcut.
+ */
+export const compileContract = async (_connection: NetworkConnection, hre: any) => {
     try {
-        await env.run('compile')
-        console.log('\x1b[32m%s\x1b[0m', `Contracts have been compiled`)
+        await hre.tasks.getTask('build').run({})
+        console.log('\x1b[32m%s\x1b[0m', `Contracts have been built`)
         return true
     } catch (err) {
-        console.log('\x1b[33m%s\x1b[0m', `Error compiling contract`, err)
+        console.log('\x1b[33m%s\x1b[0m', `Error building contracts`, err)
         return false
     }
 }
 
-export const etherscanVerifyContract = async (env: any, contractAddress: string) => {
+/**
+ * Verify a contract on Etherscan (or another configured provider) using
+ * the v3 {@link verifyContract} helper from `@nomicfoundation/hardhat-verify`.
+ */
+export const etherscanVerifyContract = async (hre: any, contractAddress: string, constructorArgs: any[] = []) => {
     try {
-        await env.run('verify:verify', {
-            address: contractAddress,
-            constructorArguments: []
-        })
-        console.log('\x1b[32m%s\x1b[0m', `Contract: ${contractAddress} has been verify on etherscan.io`)
+        await verifyContract(
+            {
+                address: contractAddress,
+                constructorArgs
+            },
+            hre
+        )
+        console.log('\x1b[32m%s\x1b[0m', `Contract: ${contractAddress} has been verified on etherscan.io`)
         return true
     } catch (err) {
         console.log('\x1b[33m%s\x1b[0m', `Error verifying contract on etherscan.io`, err)
@@ -70,9 +81,7 @@ export const getLastCommit = async () => {
         await runCommand('git log -n 1 > ' + TEMP_FILE)
         if (fs.existsSync('./' + TEMP_FILE)) {
             const lastGitCommitData = fs.readFileSync('./' + TEMP_FILE, 'utf8')
-            // Separate the commit id from the rest of the commit message
             commitId = lastGitCommitData.split(' ')[1].substring(0, 8)
-            // Delete the temporary file
             fs.unlinkSync('./' + TEMP_FILE)
         } else console.log('\x1b[31m%s\x1b[0m', `Could not find ${TEMP_FILE}`)
         return {
@@ -90,7 +99,6 @@ export const getLastCommit = async () => {
 
 export const commitChanges = async (commitComment: string, commitDescription: string, filesToCommit: string) => {
     try {
-        // Commit the new storage layout
         await runCommand(`git commit -a -m "deployment-tool: ${commitComment}" -m "${commitDescription}"`)
         console.log('\x1b[32m%s\x1b[0m', `Files ${filesToCommit} are Committed in the repo`)
         return true

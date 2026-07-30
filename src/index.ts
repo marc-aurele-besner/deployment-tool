@@ -1,107 +1,125 @@
 #!/usr/bin/env node
 
-import '@nomiclabs/hardhat-ethers'
-import '@openzeppelin/hardhat-upgrades'
-import 'hardhat-awesome-cli'
-import { extendConfig, extendEnvironment, task } from 'hardhat/config'
-import { lazyObject } from 'hardhat/plugins'
-import { HardhatConfig, HardhatUserConfig } from 'hardhat/types'
+import type { ConfigurationVariableResolver, HardhatConfig, HardhatUserConfig } from 'hardhat/types/config'
+import type { HardhatPlugin } from 'hardhat/types/plugins'
 import path from 'path'
 
-import { ContractDeployment } from './ContractDeployment'
-import serveTasks from './serveTasks'
-import './type-extensions'
+import { definePlugin } from 'hardhat/plugins'
+import { task } from 'hardhat/config'
 
-extendConfig(async (config: HardhatConfig, userConfig: HardhatUserConfig) => {
-    const userPath = userConfig.paths?.deployment
+import './type-extensions.js'
+
+/**
+ * Hardhat 3 config hook that resolves `paths.deployment` from the user
+ * config into the resolved config. This replaces the `extendConfig`
+ * callback the Hardhat 2 plugin used.
+ */
+async function resolveUserConfig(
+    userConfig: HardhatUserConfig,
+    _resolveConfigurationVariable: ConfigurationVariableResolver,
+    next: (
+        nextUserConfig: HardhatUserConfig,
+        nextResolveConfigurationVariable: ConfigurationVariableResolver
+    ) => Promise<HardhatConfig>
+): Promise<HardhatConfig> {
+    const config = await next(userConfig, _resolveConfigurationVariable)
+    const userPath = (userConfig.paths as { deployment?: string } | undefined)?.deployment
     let deployment: string
     if (userPath === undefined) deployment = path.join(config.paths.root, 'deployment')
-    else {
-        if (path.isAbsolute(userPath)) deployment = userPath
-        else deployment = path.normalize(path.join(config.paths.root, userPath))
-    }
+    else if (path.isAbsolute(userPath)) deployment = userPath
+    else deployment = path.normalize(path.join(config.paths.root, userPath))
     config.paths.deployment = deployment
+    return config
+}
+
+function configHookHandlerFactory() {
+    return import('./hooks.js').then((mod) => ({ default: mod.default }))
+}
+
+// --- Tasks ---
+//
+// Each task's action is loaded lazily so plugin code can stay load-order safe.
+
+const deploymentTask = task('deployment', 'Deploy or update a proxy contract')
+    .setAction(() => import('./tasks/deployment.js'))
+    .build()
+
+const deployContractTask = task(
+    'deploy-contract',
+    'Deploy a proxy contract, initialize it, save the address, commit, pull and push'
+)
+    .addOption({ name: 'contractName', description: 'The name of the contract to deploy', defaultValue: '' })
+    .addOption({ name: 'initializeArguments', description: 'The initialize() argument', defaultValue: '' })
+    .addOption({
+        name: 'initializeSignature',
+        description: 'Function signature of the initialize function',
+        defaultValue: ''
+    })
+    .addOption({ name: 'tag', description: 'Add an extra tag to this version of the contract', defaultValue: '' })
+    .addOption({ name: 'extra', description: 'Extra data to save with this deployment', defaultValue: '' })
+    .addOption({ name: 'skipGit', description: 'Skip git commit, pull & push', defaultValue: '' })
+    .addOption({ name: 'verifyContract', description: 'Validate the contract on Etherscan.io', defaultValue: '' })
+    .setAction(() => import('./tasks/deploy-contract.js'))
+    .build()
+
+const upgradeContractTask = task(
+    'upgrade-contract',
+    'Upgrade a proxy contract, save the address, commit, pull and push'
+)
+    .addOption({ name: 'contractName', description: 'The name of the contract to deploy', defaultValue: '' })
+    .addOption({ name: 'tag', description: 'Add an extra tag to this version of the contract', defaultValue: '' })
+    .addOption({ name: 'extra', description: 'Extra data to save with this deployment', defaultValue: '' })
+    .addOption({ name: 'skipGit', description: 'Skip git commit, pull & push', defaultValue: '' })
+    .addOption({ name: 'verifyContract', description: 'Validate the contract on Etherscan.io', defaultValue: '' })
+    .setAction(() => import('./tasks/upgrade-contract.js'))
+    .build()
+
+const deployContractStaticTask = task(
+    'deploy-contract-static',
+    'Deploy a static contract, save the address, commit, pull and push'
+)
+    .addOption({ name: 'contractName', description: 'The name of the contract to deploy', defaultValue: '' })
+    .addOption({ name: 'constructorArguments', description: 'The constructor() argument', defaultValue: '' })
+    .addOption({ name: 'tag', description: 'Add an extra tag to this version of the contract', defaultValue: '' })
+    .addOption({ name: 'extra', description: 'Extra data to save with this deployment', defaultValue: '' })
+    .addOption({ name: 'skipGit', description: 'Skip git commit, pull & push', defaultValue: '' })
+    .addOption({ name: 'verifyContract', description: 'Validate the contract on Etherscan.io', defaultValue: '' })
+    .setAction(() => import('./tasks/deploy-contract-static.js'))
+    .build()
+
+const testDeployThenUpgradeTask = task(
+    'test-deploy-then-upgrade-contract',
+    'Upgrade a proxy contract, save the address, commit, pull and push'
+)
+    .addOption({ name: 'contractName', description: 'The name of the contract to deploy', defaultValue: '' })
+    .addOption({ name: 'initializeArguments', description: 'The initialize() argument', defaultValue: '' })
+    .addOption({
+        name: 'initializeSignature',
+        description: 'Function signature of the initialize function',
+        defaultValue: ''
+    })
+    .addOption({ name: 'tag', description: 'Add an extra tag to this version of the contract', defaultValue: '' })
+    .addOption({ name: 'extra', description: 'Extra data to save with this deployment', defaultValue: '' })
+    .addOption({ name: 'skipGit', description: 'Skip git commit, pull & push', defaultValue: '' })
+    .addOption({ name: 'verifyContract', description: 'Validate the contract on Etherscan.io', defaultValue: '' })
+    .setAction(() => import('./tasks/test-deploy-then-upgrade-contract.js'))
+    .build()
+
+const deploymentToolPlugin: HardhatPlugin = definePlugin({
+    id: 'deployment-tool',
+    npmPackage: 'deployment-tool',
+    tasks: [
+        deploymentTask,
+        deployContractTask,
+        upgradeContractTask,
+        deployContractStaticTask,
+        testDeployThenUpgradeTask
+    ],
+    hookHandlers: {
+        config: configHookHandlerFactory
+    }
 })
 
-extendEnvironment(async (hre: any) => {
-    hre.contractDeployment = lazyObject(() => new ContractDeployment(hre))
-})
+export default deploymentToolPlugin
 
-/**
- * deployment task implementation
- * @param  {HardhatUserArgs} args
- * @param  {HardhatEnv} env
- */
-task('deployment', 'Deploy or Update a proxy contract').setAction(async function (args, env) {
-    // Call function
-    await serveTasks('', args, env)
-})
-
-/**
- * deploy-contract task implementation
- * @param  {HardhatUserArgs} args
- * @param  {HardhatEnv} env
- */
-task('deploy-contract', 'Deploy a proxy contract, initialize it, save the address, commit, pull and push')
-    .addOptionalParam('contractName', 'The name of the contract to deploy', '')
-    .addOptionalParam('initializeArguments', 'The initialize() argument', '')
-    .addOptionalParam('initializeSignature', 'Function signature of the initialize function', '')
-    .addOptionalParam('tag', 'Add a extra tag to this version of the contract', '')
-    .addOptionalParam('extra', 'Extra data to save with this deployment', '')
-    .addOptionalParam('skipGit', 'Skit git commit, pull & push', 'false')
-    .addOptionalParam('verifyContract', 'Validate the contract on Etherscan.io', 'false')
-    .setAction(async function (args, env) {
-        // Call function
-        await serveTasks('deploy-contract', args, env)
-    })
-
-/**
- * upgrade-contract task implementation
- * @param  {HardhatUserArgs} args
- * @param  {HardhatEnv} env
- */
-task('upgrade-contract', 'Upgrade a proxy contract, save the address, commit, pull and push')
-    .addOptionalParam('contractName', 'The name of the contract to deploy', '')
-    .addOptionalParam('tag', 'Add a extra tag to this version of the contract', '')
-    .addOptionalParam('extra', 'Extra data to save with this deployment', '')
-    .addOptionalParam('skipGit', 'Skit git commit, pull & push', 'false')
-    .addOptionalParam('verifyContract', 'Validate the contract on Etherscan.io', 'false')
-    .setAction(async function (args, env) {
-        // Call function
-        await serveTasks('upgrade-contract', args, env)
-    })
-
-/**
- * deploy-contract-static task implementation
- * @param  {HardhatUserArgs} args
- * @param  {HardhatEnv} env
- */
-task('deploy-contract-static', 'Deploy a static contract, save the address, commit, pull and push')
-    .addOptionalParam('contractName', 'The name of the contract to deploy', '')
-    .addOptionalParam('constructorArguments', 'The constructor() argument', '')
-    .addOptionalParam('tag', 'Add a extra tag to this version of the contract', '')
-    .addOptionalParam('extra', 'Extra data to save with this deployment', '')
-    .addOptionalParam('skipGit', 'Skit git commit, pull & push', 'false')
-    .addOptionalParam('verifyContract', 'Validate the contract on Etherscan.io', 'false')
-    .setAction(async function (args, env) {
-        // Call function
-        await serveTasks('deploy-contract-static', args, env)
-    })
-
-/**
- * test-deploy-then-upgrade-contract task implementation
- * @param  {HardhatUserArgs} args
- * @param  {HardhatEnv} env
- */
-task('test-deploy-then-upgrade-contract', 'Upgrade a proxy contract, save the address, commit, pull and push')
-    .addParam('contractName', 'The name of the contract to deploy', '')
-    .addOptionalParam('initializeArguments', 'The initialize() argument', '')
-    .addOptionalParam('initializeSignature', 'Function signature of the initialize function', '')
-    .addOptionalParam('tag', 'Add a extra tag to this version of the contract', '')
-    .addOptionalParam('extra', 'Extra data to save with this deployment', '')
-    .addOptionalParam('skipGit', 'Skit git commit, pull & push', 'false')
-    .addOptionalParam('verifyContract', 'Validate the contract on Etherscan.io', 'false')
-    .setAction(async function (args, env) {
-        // Call function
-        await serveTasks('test-deploy-then-upgrade-contract', args, env)
-    })
+export { resolveUserConfig }

@@ -6,10 +6,15 @@ import {
     getLastCommit,
     pullFromGit,
     pushToGit
-} from './utils'
+} from './utils.js'
 
-const deploy = async (
-    env: any,
+import type { NetworkConnection } from 'hardhat/types/network'
+import type { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
+
+export const deploy = async (
+    connection: NetworkConnection,
+    addressBook: AwesomeAddressBook,
+    hre: any,
     contractName: string,
     constructorArguments: any[] = [],
     tag?: string,
@@ -26,109 +31,91 @@ const deploy = async (
     address?: string
 }> => {
     try {
-        // Set a timeout for the deployment
-        let keepWaiting = true
-        setTimeout(() => {
-            keepWaiting = false
-        }, 60000)
-
-        const logOutput = []
+        const logOutput: Array<{ contractName: string; address: string; network: string }> = []
         let deployedContract: any = null
 
-        while (keepWaiting) {
-            // Get deployer account
-            const [deployer] = await env.ethers.getSigners()
+        // Build contracts (no-op if already up-to-date).
+        await compileContract(connection, hre)
 
-            // Make sure contract is compiled
-            await compileContract(env)
+        // Get deployer account.
+        const [deployer] = await connection.ethers.getSigners()
 
-            // Get Interface
-            const contractInterface = await env.ethers.getContractFactory(contractName)
+        // Get factory.
+        const contractInterface = await connection.ethers.getContractFactory(contractName)
 
-            // Deploy the contract. `constructorArguments` is an array; ethers'
-            // ContractFactory.deploy is variadic, so we must spread it.
-            deployedContract = await contractInterface.deploy(...constructorArguments)
+        // Deploy the contract.
+        deployedContract = await contractInterface.deploy(...constructorArguments)
 
-            // Get Transaction Receipt
-            const deployedContractTnx = await deployedContract.deployTransaction.wait()
-            await deployedContract.deployed()
+        // Wait for the deployment to be mined. In Hardhat 3 / ethers v6 the
+        // returned contract exposes `deploymentTransaction()` (method) rather
+        // than the v5 `deployTransaction` (property).
+        const deployedContractTnx = await deployedContract.deploymentTransaction().wait()
+        await deployedContract.waitForDeployment()
 
-            // Save deployment arguments
-            const extraData = {
-                ...extra,
-                constructorArguments
-            }
-
-            // Save the deployment details
-            await env.addressBook.saveContract(
-                contractName,
-                deployedContract.address,
-                env.network.name,
-                deployer.address,
-                env.network.config.chainId,
-                deployedContractTnx.blockHash,
-                deployedContractTnx.blockNumber,
-                tag,
-                extraData,
-                forceSave
-            )
-            logOutput.push({
-                contractName,
-                address: deployedContract.address,
-                network: env.network.name
-            })
-
-            // Console log the address
-            console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.address)
-
-            // Verify the contract
-            if (verifyContract) await etherscanVerifyContract(env, deployedContract.address)
-
-            if (!skipGit) {
-                // Add the contract address files and contract storage layout to the next commit
-                const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
-                const isAddedToCommit = await addToCommit(filesToCommit)
-                let isCommitted = false
-
-                // Get last CommitId
-                const lastCommit = await getLastCommit()
-
-                // Commit
-                if (isAddedToCommit && lastCommit.success)
-                    isCommitted = await commitChanges(
-                        `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
-                        `Network: ${env.network.name}, Deployer: ${deployer.address}, Contract Address: ${
-                            deployedContract.address
-                        }, Constructor Arguments: ${JSON.stringify(constructorArguments)}`,
-                        filesToCommit
-                    )
-                let isPull = false
-
-                // Pull
-                if (isCommitted) isPull = await pullFromGit()
-
-                // Push
-                if (isPull) await pushToGit(filesToCommit)
-            } else console.log('Skipping git commit, pull & push')
-            // Exit
-            keepWaiting = false
-
-            // Return the deployed contract and Proxy Admin
-            if (logOutput.length > 0) console.table(logOutput)
+        // Save deployment arguments.
+        const extraData = {
+            ...extra,
+            constructorArguments
         }
-        // Return the deployed contract{
+
+        // Save the deployment details to the address book.
+        addressBook.saveContract(
+            contractName,
+            deployedContract.target as string,
+            connection.networkName,
+            deployer.address,
+            connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0,
+            deployedContractTnx.blockHash,
+            deployedContractTnx.blockNumber,
+            tag,
+            extraData,
+            forceSave
+        )
+        logOutput.push({
+            contractName,
+            address: deployedContract.target as string,
+            network: connection.networkName
+        })
+
+        console.log('\x1b[32m%s\x1b[0m', `${contractName} deployed at address: `, deployedContract.target)
+
+        // Verify the contract.
+        if (verifyContract) await etherscanVerifyContract(hre, deployedContract.target as string, constructorArguments)
+
+        if (!skipGit) {
+            const filesToCommit = `.openzeppelin/ contractsAddressDeployed.json contractsAddressDeployedHistory.json`
+            const isAddedToCommit = await addToCommit(filesToCommit)
+            let isCommitted = false
+
+            const lastCommit = await getLastCommit()
+            if (isAddedToCommit && lastCommit.success)
+                isCommitted = await commitChanges(
+                    `🆕 ${contractName} deployed from commitId: ${lastCommit.commitId}`,
+                    `Network: ${connection.networkName}, Deployer: ${deployer.address}, Contract Address: ${
+                        deployedContract.target
+                    }, Constructor Arguments: ${JSON.stringify(constructorArguments)}`,
+                    filesToCommit
+                )
+            let isPull = false
+            if (isCommitted) isPull = await pullFromGit()
+            if (isPull) await pushToGit(filesToCommit)
+        } else console.log('Skipping git commit, pull & push')
+
+        if (logOutput.length > 0) console.table(logOutput)
+
         return {
             success: true,
             message: 'Deployment successful',
             contractName,
             contract: deployedContract,
-            address: deployedContract.address
+            address: deployedContract.target
         }
     } catch (err) {
+        console.error('deploy error:', err)
         return {
             success: false,
             message: 'Deployment failed',
-            error: err as string
+            error: (err as Error)?.message ?? String(err)
         }
     }
 }

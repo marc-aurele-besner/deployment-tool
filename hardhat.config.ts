@@ -1,16 +1,26 @@
-import '@nomicfoundation/hardhat-verify'
-import '@nomiclabs/hardhat-ethers'
-import '@openzeppelin/hardhat-upgrades'
-import 'hardhat-awesome-cli'
+import hardhatToolboxMochaEthersPlugin from '@nomicfoundation/hardhat-toolbox-mocha-ethers'
+import hardhatAwesomeCliPlugin from 'hardhat-awesome-cli/plugin'
+import ozUpgradesPlugin from '@openzeppelin/hardhat-upgrades'
+import { defineConfig } from 'hardhat/config'
 
-// Load the plugin under test. Side-effect imports register tasks
-// and extend the Hardhat runtime with `contractDeployment`.
-import './src/index'
+import deploymentToolPlugin from './src/index.js'
 
+// Load the plugin under test. Hardhat 3 is declarative — plugins are added
+// to the `plugins` array, not imported for side effects. We still import
+// the default export to reference it in `plugins`.
 const config = {
+    plugins: [
+        hardhatToolboxMochaEthersPlugin,
+        ozUpgradesPlugin,
+        hardhatAwesomeCliPlugin,
+        deploymentToolPlugin
+    ],
     solidity: {
-        compilers: [
-            {
+        profiles: {
+            default: {
+                version: '0.8.20'
+            },
+            production: {
                 version: '0.8.20',
                 settings: {
                     optimizer: {
@@ -19,14 +29,8 @@ const config = {
                     }
                 }
             }
-        ]
-    },
-    networks: {
-        hardhat: {
-            // Allow large contracts (the OZ proxy + impl pattern can exceed the default).
-            allowUnlimitedContractSize: true
         }
     }
 }
 
-export default config
+export default defineConfig(config)

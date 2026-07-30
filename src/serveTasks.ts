@@ -1,8 +1,6 @@
 import inquirer from 'inquirer'
 
-import deploy from './deploy'
-import deployProxy from './deployProxy'
-import upgradeProxy from './upgradeProxy'
+import type { ContractDeployment } from './ContractDeployment.js'
 
 const inquirerContractNameInput = [
     {
@@ -28,7 +26,7 @@ const inquirerConstructor = [
     {
         type: 'input',
         name: 'constructorArguments',
-        message: 'What is the constructor() argument? (separate multiple arguments with a comma)'
+        message: 'What is the constructor() argument?'
     }
 ]
 const inquirerExtra = [
@@ -53,208 +51,94 @@ const inquirerExtra = [
         message: 'Do you want to verify the contract on Etherscan.io?'
     }
 ]
-const serveDeployTask = async (args: any, env: any) => {
+
+const runDeployProxy = async (cd: ContractDeployment, args: any) => {
+    const initializeSignature = args.initializeSignature ? args.initializeSignature : 'initialize'
+    const initializeArguments = args.initializeArguments ? args.initializeArguments.split(',') : []
+    await cd.deployContract(
+        args.contractName,
+        initializeArguments,
+        initializeSignature,
+        args.tag,
+        args.extra,
+        args.skipGit && args.skipGit === 'true' ? true : !!args.skipGit,
+        args.verifyContract && args.verifyContract === 'true' ? true : !!args.verifyContract
+    )
+}
+
+const runUpgradeProxy = async (cd: ContractDeployment, args: any) => {
+    await cd.upgradeContract(
+        args.contractName,
+        args.tag,
+        args.extra,
+        args.skipGit && args.skipGit === 'true' ? true : !!args.skipGit,
+        args.verifyContract && args.verifyContract === 'true' ? true : !!args.verifyContract
+    )
+}
+
+const runDeployStatic = async (cd: ContractDeployment, args: any) => {
+    const constructorArguments = args.constructorArguments ? args.constructorArguments.split(',') : []
+    await cd.deployContractStatic(
+        args.contractName,
+        constructorArguments,
+        args.tag,
+        args.extra,
+        args.skipGit && args.skipGit === 'true' ? true : !!args.skipGit,
+        args.verifyContract && args.verifyContract === 'true' ? true : !!args.verifyContract
+    )
+}
+
+const serveDeployTask = async (args: any, cd: ContractDeployment) => {
     if (!args.contractName || args.contractName === '')
         await inquirer
             .prompt([...inquirerContractNameInput, ...inquirerInitializer, ...inquirerExtra])
-            .then(
-                async (answers: {
-                    contractName: string
-                    initializeSignature: string
-                    initializeArguments: string
-                    tag: string
-                    extra: string
-                    skipGit: boolean
-                    verifyContract: boolean
-                }) => {
-                    const initializeArguments = answers.initializeArguments
-                        ? answers.initializeArguments.split(',')
-                        : []
-                    await deployProxy(
-                        env,
-                        answers.contractName,
-                        initializeArguments,
-                        answers.initializeSignature,
-                        answers.tag,
-                        answers.extra,
-                        answers.skipGit,
-                        answers.verifyContract
-                    )
-                }
-            )
+            .then(async (answers) => runDeployProxy(cd, answers))
             .catch((err: any) => {
                 console.log(err)
             })
-            .finally(() => {
-                process.exit(0)
-            })
-    else {
-        const initializeSignature = args.initializeSignature ? args.initializeSignature : 'initialize'
-        const initializeArguments = args.initializeArguments ? args.initializeArguments.split(',') : []
-        await deployProxy(
-            env,
-            args.contractName,
-            initializeArguments,
-            initializeSignature,
-            args.tag,
-            args.extra,
-            args.skipGit && args.skipGit === 'true' ? true : false,
-            args.verifyContract && args.verifyContract === 'true' ? true : false
-        )
-    }
+            .finally(() => process.exit(0))
+    else await runDeployProxy(cd, args)
 }
 
-const serveUpgradeTask = async (args: any, env: any) => {
+const serveUpgradeTask = async (args: any, cd: ContractDeployment) => {
     if (!args.contractName || args.contractName === '')
         await inquirer
             .prompt([...inquirerContractNameInput, ...inquirerExtra])
-            .then(
-                async (answers: {
-                    contractName: string
-                    tag: string
-                    extra: string
-                    skipGit: boolean
-                    verifyContract: boolean
-                }) => {
-                    await upgradeProxy(
-                        env,
-                        answers.contractName,
-                        answers.tag,
-                        answers.extra,
-                        answers.skipGit,
-                        answers.verifyContract
-                    )
-                }
-            )
+            .then(async (answers) => runUpgradeProxy(cd, answers))
             .catch((err: any) => {
                 console.log(err)
             })
-            .finally(() => {
-                process.exit(0)
-            })
-    else {
-        await upgradeProxy(
-            env,
-            args.contractName,
-            args.tag,
-            args.extra,
-            args.skipGit && args.skipGit === 'true' ? true : false,
-            args.verifyContract && args.verifyContract === 'true' ? true : false
-        )
-    }
+            .finally(() => process.exit(0))
+    else await runUpgradeProxy(cd, args)
 }
 
-const serveDeployStaticTask = async (args: any, env: any) => {
+const serveDeployStaticTask = async (args: any, cd: ContractDeployment) => {
     if (!args.contractName || args.contractName === '')
         await inquirer
             .prompt([...inquirerContractNameInput, ...inquirerConstructor, ...inquirerExtra])
-            .then(
-                async (answers: {
-                    contractName: string
-                    constructorArguments: string
-                    tag: string
-                    extra: string
-                    skipGit: boolean
-                    verifyContract: boolean
-                }) => {
-                    const constructorArguments = answers.constructorArguments
-                        ? answers.constructorArguments.split(',')
-                        : []
-                    await deploy(
-                        env,
-                        answers.contractName,
-                        constructorArguments,
-                        answers.tag,
-                        answers.extra,
-                        answers.skipGit,
-                        answers.verifyContract
-                    )
-                }
-            )
+            .then(async (answers) => runDeployStatic(cd, answers))
             .catch((err: any) => {
                 console.log(err)
             })
-            .finally(() => {
-                process.exit(0)
-            })
-    else {
-        const constructorArguments = args.constructorArguments ? args.constructorArguments.split(',') : []
-        await deploy(
-            env,
-            args.contractName,
-            constructorArguments,
-            args.tag,
-            args.extra,
-            args.skipGit && args.skipGit === 'true' ? true : false,
-            args.verifyContract && args.verifyContract === 'true' ? true : false
-        )
-    }
+            .finally(() => process.exit(0))
+    else await runDeployStatic(cd, args)
 }
 
-const serveTestTask = async (args: any, env: any) => {
+const serveTestTask = async (args: any, cd: ContractDeployment) => {
     if (!args.contractName || args.contractName === '')
         await inquirer
             .prompt([...inquirerContractNameInput, ...inquirerInitializer, ...inquirerExtra])
-            .then(
-                async (answers: {
-                    contractName: string
-                    initializeSignature: string
-                    initializeArguments: string
-                    tag: string
-                    extra: string
-                    skipGit: boolean
-                    verifyContract: boolean
-                }) => {
-                    const initializeArguments = answers.initializeArguments
-                        ? answers.initializeArguments.split(',')
-                        : []
-                    await deployProxy(
-                        env,
-                        answers.contractName,
-                        initializeArguments,
-                        answers.initializeSignature,
-                        answers.tag,
-                        answers.extra,
-                        answers.skipGit,
-                        answers.verifyContract
-                    )
-                    await upgradeProxy(
-                        env,
-                        answers.contractName,
-                        answers.tag,
-                        answers.extra,
-                        answers.skipGit,
-                        answers.verifyContract
-                    )
-                }
-            )
+            .then(async (answers) => {
+                await runDeployProxy(cd, answers)
+                await runUpgradeProxy(cd, answers)
+            })
             .catch((err: any) => {
                 console.log(err)
             })
-            .finally(() => {
-                process.exit(0)
-            })
+            .finally(() => process.exit(0))
     else {
-        const initializeSignature = args.initializeSignature ? args.initializeSignature : 'initialize'
-        const initializeArguments = args.initializeArguments ? args.initializeArguments.split(',') : []
-        await deployProxy(
-            env,
-            args.contractName,
-            initializeArguments,
-            initializeSignature,
-            args.tag,
-            args.extra,
-            args.skipGit && args.skipGit === 'true' ? true : false,
-            args.verifyContract && args.verifyContract === 'true' ? true : false
-        )
-        await upgradeProxy(
-            env,
-            args.contractName,
-            args.tag,
-            args.extra,
-            args.skipGit && args.skipGit === 'true' ? true : false,
-            args.verifyContract && args.verifyContract === 'true' ? true : false
-        )
+        await runDeployProxy(cd, args)
+        await runUpgradeProxy(cd, args)
     }
 }
 
@@ -273,18 +157,17 @@ const serveCLI = async (task: string) => {
     else return task
 }
 
-const serveFunction = async (task: string, args: any, env: any) => {
+const serveFunction = async (task: string, args: any, cd: ContractDeployment) => {
     const action = await serveCLI(task)
-    if (action === 'deploy-contract') await serveDeployTask(args, env)
-    if (action === 'upgrade-contract') await serveUpgradeTask(args, env)
-    if (action === 'deploy-contract-static') await serveDeployStaticTask(args, env)
-    if (action === 'test-deploy-then-upgrade-contract') await serveTestTask(args, env)
+    if (action === 'deploy-contract') await serveDeployTask(args, cd)
+    if (action === 'upgrade-contract') await serveUpgradeTask(args, cd)
+    if (action === 'deploy-contract-static') await serveDeployStaticTask(args, cd)
+    if (action === 'test-deploy-then-upgrade-contract') await serveTestTask(args, cd)
 }
 
-const serveTasks = async (task: string, args: any, env: any) => {
-    console.log(`Deployment tools for Gluwa
-`)
-    return serveFunction(task, args, env)
+const serveTasks = async (task: string, args: any, cd: ContractDeployment) => {
+    console.log(`Deployment tools for Gluwa\n`)
+    return serveFunction(task, args, cd)
 }
 
 export default serveTasks
