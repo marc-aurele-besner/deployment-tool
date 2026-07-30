@@ -2,7 +2,7 @@ import { strict as assert } from 'assert'
 
 import inquirer from 'inquirer'
 
-import { INTERACTIVE_BANNER, INTERACTIVE_CHOICES, parseBooleanArg, runInteractive } from '../src/serveTasks.js'
+import { INTERACTIVE_BANNER, INTERACTIVE_CHOICES, parseArgumentsArg, parseBooleanArg, runInteractive } from '../src/serveTasks.js'
 
 /**
  * Unit tests for the CLI boolean-argument parser used by every task runner
@@ -124,6 +124,181 @@ describe('INTERACTIVE_BANNER', function () {
 
     it('mentions the package name', function () {
         assert.ok(INTERACTIVE_BANNER.toLowerCase().includes('deployment-tool'))
+    })
+})
+
+/**
+ * Unit tests for the typed constructor / initialize argument parser
+ * ({@link parseArgumentsArg}). Replaces the previous `value.split(',')`
+ * inline call, which could not express numbers, booleans, addresses, or
+ * nested values, and silently passed wrong constructor/initializer values
+ * (issue #100).
+ *
+ * The parser supports three input shapes:
+ *
+ *   1. Empty / nullish input → `[]`
+ *   2. JSON array or object → parsed and returned as an array
+ *   3. Plain comma-separated string → legacy split fallback
+ *
+ * It also accepts already-parsed values for programmatic invocation.
+ */
+describe('parseArgumentsArg', function () {
+    describe('absent / empty inputs', function () {
+        it('returns [] for undefined', function () {
+            assert.deepEqual(parseArgumentsArg(undefined), [])
+        })
+
+        it('returns [] for null', function () {
+            assert.deepEqual(parseArgumentsArg(null), [])
+        })
+
+        it('returns [] for the empty string (Hardhat addOption default)', function () {
+            assert.deepEqual(parseArgumentsArg(''), [])
+        })
+
+        it('returns [] for whitespace-only strings', function () {
+            // Pure whitespace used to fall through to .split(',') and produce
+            // ['', ''] — which downstream ethers treats as two empty args.
+            assert.deepEqual(parseArgumentsArg('   '), [])
+            assert.deepEqual(parseArgumentsArg('\t\n'), [])
+        })
+    })
+
+    describe('JSON array input', function () {
+        it('parses a JSON array of mixed types', function () {
+            assert.deepEqual(parseArgumentsArg('["hello", 1, true]'), ['hello', 1, true])
+        })
+
+        it('parses a JSON array of numbers', function () {
+            assert.deepEqual(parseArgumentsArg('[1, 2, 3]'), [1, 2, 3])
+        })
+
+        it('parses a JSON array of booleans', function () {
+            assert.deepEqual(parseArgumentsArg('[true, false, true]'), [true, false, true])
+        })
+
+        it('parses an empty JSON array as []', function () {
+            assert.deepEqual(parseArgumentsArg('[]'), [])
+        })
+
+        it('parses nested JSON arrays', function () {
+            assert.deepEqual(parseArgumentsArg('[[1, 2], [3, 4]]'), [
+                [1, 2],
+                [3, 4]
+            ])
+        })
+
+        it('tolerates leading and trailing whitespace', function () {
+            assert.deepEqual(parseArgumentsArg('  ["a", "b"]  '), ['a', 'b'])
+        })
+    })
+
+    describe('JSON object input', function () {
+        it('wraps a JSON object in a single-element array', function () {
+            // Deploy args expect any[]; a single object still has to be
+            // forwarded as a one-element array so the downstream contract
+            // call sees exactly one positional argument.
+            assert.deepEqual(parseArgumentsArg('{"x": 1}'), [{ x: 1 }])
+        })
+
+        it('preserves nested structures in a wrapped object', function () {
+            assert.deepEqual(parseArgumentsArg('{"name": "Greeter", "value": 42}'), [
+                { name: 'Greeter', value: 42 }
+            ])
+        })
+    })
+
+    describe('plain comma-separated string (legacy fallback)', function () {
+        it('splits a single value', function () {
+            assert.deepEqual(parseArgumentsArg('hello'), ['hello'])
+        })
+
+        it('splits multiple comma-separated values', function () {
+            assert.deepEqual(parseArgumentsArg('Alice,Bob,Carol'), ['Alice', 'Bob', 'Carol'])
+        })
+
+        it('does not strip surrounding whitespace from each value', function () {
+            // We deliberately do not trim individual elements — strings
+            // can legitimately contain leading/trailing spaces, and
+            // trimming silently would corrupt those.
+            assert.deepEqual(parseArgumentsArg('a, b, c'), ['a', ' b', ' c'])
+        })
+
+        it('treats a single non-JSON value as one element, not an empty split', function () {
+            // Regression: the legacy `.split(',')` call would never produce
+            // [] for a non-empty non-JSON string; preserve that.
+            assert.deepEqual(parseArgumentsArg('hello'), ['hello'])
+            assert.deepEqual(parseArgumentsArg('hello world'), ['hello world'])
+        })
+    })
+
+    describe('malformed JSON', function () {
+        it('throws a clear error when JSON-looking input is malformed', function () {
+            // The parser only attempts JSON.parse on input whose first
+            // non-whitespace char is `[` or `{`. A malformed array like
+            // '[1, 2,' triggers JSON.parse, which throws — we re-throw
+            // with a clear, actionable message.
+            assert.throws(
+                () => parseArgumentsArg('[1, 2,'),
+                /Failed to parse arguments as JSON/
+            )
+        })
+
+        it('includes the offending input in the error message', function () {
+            assert.throws(() => parseArgumentsArg('[1, 2,'), /\[1, 2,/)
+        })
+
+        it('includes the underlying JSON.parse reason', function () {
+            // The native JSON.parse error message ("Unexpected token..." /
+            // "Unexpected end of JSON input") is propagated so users can
+            // diagnose syntax issues without guessing.
+            assert.throws(
+                () => parseArgumentsArg('[1, 2,'),
+                /Unexpected (end of JSON input|token)/
+            )
+        })
+
+        it('throws on a malformed JSON object', function () {
+            assert.throws(
+                () => parseArgumentsArg('{"x": '),
+                /Failed to parse arguments as JSON/
+            )
+        })
+
+        it('does not throw on JSON-looking input that is actually valid', function () {
+            // Sanity check — a value that *looks* JSON-ish (starts with [)
+            // but is also a valid empty array must not throw.
+            assert.doesNotThrow(() => parseArgumentsArg('[]'))
+            assert.doesNotThrow(() => parseArgumentsArg('{}'))
+        })
+
+        it('does not throw on non-JSON-looking input (plain string fallback)', function () {
+            // A string that does not start with `[` or `{` is treated as
+            // a plain comma-separated list, not as JSON — so we must not
+            // throw on input like 'not valid json {'.
+            assert.doesNotThrow(() => parseArgumentsArg('not valid json {'))
+            assert.deepEqual(parseArgumentsArg('not valid json {'), ['not valid json {'])
+        })
+    })
+
+    describe('already-parsed programmatic inputs', function () {
+        it('passes an existing array through unchanged', function () {
+            const arr = [1, 'two', { three: 3 }]
+            assert.strictEqual(parseArgumentsArg(arr), arr)
+        })
+
+        it('wraps a single object in a one-element array', function () {
+            const obj = { x: 1 }
+            assert.deepEqual(parseArgumentsArg(obj), [obj])
+        })
+
+        it('wraps a single primitive in a one-element array', function () {
+            // Hardhat's addOption can deliver booleans / numbers as
+            // already-typed values when invoked from scripts; the
+            // wrapper must still produce an array.
+            assert.deepEqual(parseArgumentsArg(42), [42])
+            assert.deepEqual(parseArgumentsArg(true), [true])
+        })
     })
 })
 
