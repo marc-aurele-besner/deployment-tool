@@ -2,7 +2,13 @@ import { strict as assert } from 'assert'
 
 import inquirer from 'inquirer'
 
-import { INTERACTIVE_BANNER, INTERACTIVE_CHOICES, parseArgumentsArg, parseBooleanArg, runInteractive } from '../src/serveTasks.js'
+import {
+    INTERACTIVE_BANNER,
+    INTERACTIVE_CHOICES,
+    parseArgumentsArg,
+    parseBooleanArg,
+    runInteractive
+} from '../src/serveTasks.js'
 
 /**
  * Unit tests for the CLI boolean-argument parser used by every task runner
@@ -202,9 +208,7 @@ describe('parseArgumentsArg', function () {
         })
 
         it('preserves nested structures in a wrapped object', function () {
-            assert.deepEqual(parseArgumentsArg('{"name": "Greeter", "value": 42}'), [
-                { name: 'Greeter', value: 42 }
-            ])
+            assert.deepEqual(parseArgumentsArg('{"name": "Greeter", "value": 42}'), [{ name: 'Greeter', value: 42 }])
         })
     })
 
@@ -238,10 +242,7 @@ describe('parseArgumentsArg', function () {
             // non-whitespace char is `[` or `{`. A malformed array like
             // '[1, 2,' triggers JSON.parse, which throws — we re-throw
             // with a clear, actionable message.
-            assert.throws(
-                () => parseArgumentsArg('[1, 2,'),
-                /Failed to parse arguments as JSON/
-            )
+            assert.throws(() => parseArgumentsArg('[1, 2,'), /Failed to parse arguments as JSON/)
         })
 
         it('includes the offending input in the error message', function () {
@@ -252,17 +253,11 @@ describe('parseArgumentsArg', function () {
             // The native JSON.parse error message ("Unexpected token..." /
             // "Unexpected end of JSON input") is propagated so users can
             // diagnose syntax issues without guessing.
-            assert.throws(
-                () => parseArgumentsArg('[1, 2,'),
-                /Unexpected (end of JSON input|token)/
-            )
+            assert.throws(() => parseArgumentsArg('[1, 2,'), /Unexpected (end of JSON input|token)/)
         })
 
         it('throws on a malformed JSON object', function () {
-            assert.throws(
-                () => parseArgumentsArg('{"x": '),
-                /Failed to parse arguments as JSON/
-            )
+            assert.throws(() => parseArgumentsArg('{"x": '), /Failed to parse arguments as JSON/)
         })
 
         it('does not throw on JSON-looking input that is actually valid', function () {

@@ -7,16 +7,45 @@ on:
     branches: [main, dev]
 
 jobs:
-  test:
-    name: Plugin tests
+  quality:
+    name: Lint, format & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Use Node.js 20
+      - name: Use Node.js 24
         uses: actions/setup-node@v7
         with:
           node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build published artifact
+        run: npm run build
+
+  test:
+    name: Plugin tests (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Hardhat 3 requires Node >= 22.13.0.
+        node-version: ['22', '24']
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
@@ -27,3 +56,74 @@ jobs:
 
       - name: Run plugin tests
         run: npm test
+
+  pack:
+    name: Package smoke test
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Build and pack the package
+        run: |
+          # `npm pack` does not run a build (only `prepublishOnly` does, on
+          # publish), and dist/ is gitignored, so build explicitly first.
+          npm run build
+          mkdir -p "$RUNNER_TEMP/pack"
+          npm pack --pack-destination "$RUNNER_TEMP/pack"
+          tarball="$(find "$RUNNER_TEMP/pack" -maxdepth 1 -name '*.tgz' | head -n 1)"
+          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
+          echo "Packed: $tarball"
+
+      - name: Show tarball contents
+        run: tar -tzf "$TARBALL"
+
+      - name: Assert build artifacts are present
+        run: |
+          contents="$(tar -tzf "$TARBALL")"
+          for entry in package/dist/index.js package/dist/index.d.ts package/dist/cli.js package/README.md package/LICENSE; do
+            if ! grep -qx "$entry" <<< "$contents"; then
+              echo "::error::Expected $entry in the published tarball"
+              exit 1
+            fi
+          done
+
+      - name: Install the tarball into a clean consumer project
+        run: |
+          consumer="$RUNNER_TEMP/consumer"
+          mkdir -p "$consumer"
+          cd "$consumer"
+          npm init -y > /dev/null
+          npm pkg set type=module > /dev/null
+          # Peer dependencies are not installed automatically, and the plugin
+          # entry point imports Hardhat, so install them alongside the tarball.
+          npm install --no-audit --no-fund --legacy-peer-deps \
+            "$TARBALL" \
+            'hardhat@^3.0.0' \
+            '@nomicfoundation/hardhat-ethers@^4.0.0' \
+            '@nomicfoundation/hardhat-verify@^3.0.10' \
+            '@openzeppelin/hardhat-upgrades@^4.0.0' \
+            'hardhat-awesome-cli@^0.7.2'
+
+      - name: Import the packed package
+        run: |
+          cd "$RUNNER_TEMP/consumer"
+          node --input-type=module -e "
+            const mod = await import('deployment-tool')
+            const expected = ['ContractDeployment', 'createContractDeployment', 'resolveUserConfig']
+            const missing = expected.filter((name) => !(name in mod))
+            if (missing.length > 0) {
+              console.error('Missing exports: ' + missing.join(', '))
+              process.exit(1)
+            }
+            console.log('Resolved exports: ' + Object.keys(mod).join(', '))
+          "
