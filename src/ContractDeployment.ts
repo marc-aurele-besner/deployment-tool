@@ -18,6 +18,12 @@ export class ContractDeployment {
         private readonly addressBook: AwesomeAddressBook
     ) {}
 
+    /**
+     * Deploy an upgradeable proxy via {@link deployProxy}.
+     *
+     * `verify` defaults to `true` (forwarded to {@link deployProxy}); pass
+     * `false` to skip Etherscan verification.
+     */
     public async deployContract(
         contractName: string,
         initializeArguments: any[] = [],
@@ -41,6 +47,14 @@ export class ContractDeployment {
         )
     }
 
+    /**
+     * Upgrade an existing proxy via {@link upgradeProxy}.
+     *
+     * `verify` defaults to `true` (forwarded to {@link upgradeProxy}); pass
+     * `false` to skip Etherscan verification. Aligning the default with
+     * {@link deployContract} ensures an upgrade verifies by default — both
+     * proxy and new implementation are submitted to Etherscan (issue #97).
+     */
     public async upgradeContract(contractName: string, tag?: string, extra?: any, skipGit?: boolean, verify?: boolean) {
         return upgradeProxy(this.connection, this.addressBook, this.hre, contractName, tag, extra, skipGit, verify)
     }

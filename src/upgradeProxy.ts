@@ -12,6 +12,16 @@ import { upgrades as upgradesFactory } from '@openzeppelin/hardhat-upgrades'
 import type { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
 import type { NetworkConnection } from 'hardhat/types/network'
 
+/**
+ * Upgrade an existing proxy to a new implementation contract.
+ *
+ * @param verifyContractFlag Whether to verify both the proxy and the new
+ *   implementation contract on Etherscan. Defaults to `true` so an upgrade
+ *   that swaps the logic behind a proxy also updates the block-explorer
+ *   view of that contract — verify on by default matches `deployProxy`'s
+ *   default (issue #97). Pass `false` to skip verification (e.g. on
+ *   networks that have no configured Etherscan key).
+ */
 export const upgradeProxy = async (
     connection: NetworkConnection,
     addressBook: AwesomeAddressBook,
@@ -19,8 +29,8 @@ export const upgradeProxy = async (
     contractName: string,
     tag?: string,
     extra?: any,
-    skipGit?: boolean,
-    verifyContractFlag?: boolean
+    skipGit = false as boolean,
+    verifyContractFlag = true as boolean
 ): Promise<{
     success: boolean
     message: string
