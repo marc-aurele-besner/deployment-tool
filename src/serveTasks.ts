@@ -66,7 +66,8 @@ export const parseArgumentsArg = (value: unknown): unknown[] => {
                 `Failed to parse arguments as JSON: ${reason}. ` +
                     `Pass a JSON array (e.g. '["hello", 1, true]') or a JSON object ` +
                     `wrapped in an array, or fall back to a plain comma-separated ` +
-                    `string list. Received: ${JSON.stringify(value)}`
+                    `string list. Received: ${JSON.stringify(value)}`,
+                { cause: err }
             )
         }
     }
@@ -200,7 +201,6 @@ const needsInteractivePrompt = (args: any): boolean =>
  *
  * Exported for testing.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const runInteractive = async (
     args: any,
     prompts: any[],
