@@ -9,7 +9,7 @@
   "main": "./dist/index.js",
   "typings": "./dist/index.d.ts",
   "bin": {
-    "deployment-tool": "./dist/index.js"
+    "deployment-tool": "./dist/cli.js"
   },
   "bugs": {
     "url": "https://github.com/marc-aurele-besner/deployment-tool/issues"

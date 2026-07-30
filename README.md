@@ -103,6 +103,21 @@ npx hardhat deploy-contract-static
 npx hardhat test-deploy-then-upgrade-contract
 ```
 
+### The `deployment-tool` command
+
+The package also ships a small `deployment-tool` binary. It lists the available
+tasks and forwards a task to your project's Hardhat, so these are equivalent:
+
+```
+deployment-tool deploy-contract --contract-name MyContract
+npx hardhat deploy-contract --contract-name MyContract
+```
+
+```
+deployment-tool --help      # list every task
+deployment-tool --version   # print the installed version
+```
+
 ### Task: deploy-contract
 
 Usage: hardhat [GLOBAL OPTIONS] deploy-contract [--contract-name <STRING>] [--extra <STRING>] [--initialize-arguments <STRING>] [--initialize-signature <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]

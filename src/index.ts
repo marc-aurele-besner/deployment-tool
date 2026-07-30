@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import type { ConfigurationVariableResolver, HardhatConfig, HardhatUserConfig } from 'hardhat/types/config'
 import type { HardhatPlugin } from 'hardhat/types/plugins'
 import path from 'path'
