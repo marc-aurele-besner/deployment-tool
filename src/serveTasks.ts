@@ -118,59 +118,92 @@ const runDeployStatic = async (cd: ContractDeployment, args: any) => {
     )
 }
 
+/**
+ * When the `deployment` task is invoked without `--contract-name`, no args
+ * reach us from Hardhat at all (see `src/tasks/deployment.ts`). When the
+ * dedicated task runners are invoked without `--contract-name`, args is a
+ * Hardhat task-args object whose `contractName` is the empty-string default.
+ * Either way, an empty/missing contract name means "ask the user".
+ */
+const needsInteractivePrompt = (args: any): boolean =>
+    !args || args.contractName === undefined || args.contractName === ''
+
+/**
+ * Run a task either from the provided args or — when `--contract-name` is
+ * missing — by collecting the same fields via an inquirer prompt. The
+ * prompt path owns its own process lifetime: it exits 0 on success and 1
+ * when the underlying action threw, so shell pipelines and CI see real
+ * failures instead of silently succeeding on error (issue #101).
+ *
+ * When args ARE provided, we deliberately do NOT call `process.exit`,
+ * letting Hardhat decide the exit code based on whether the action
+ * resolved or rejected.
+ *
+ * Exported for testing.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const runInteractive = async (
+    args: any,
+    prompts: any[],
+    run: (answers: any) => Promise<void>
+): Promise<void> => {
+    if (!needsInteractivePrompt(args)) {
+        await run(args)
+        return
+    }
+    let hadError = false
+    await inquirer
+        .prompt(prompts)
+        .then(async (answers) => run(answers))
+        .catch((err: any) => {
+            hadError = true
+            console.log(err)
+        })
+        .finally(() => process.exit(hadError ? 1 : 0))
+}
+
 const serveDeployTask = async (args: any, cd: ContractDeployment) => {
-    if (!args.contractName || args.contractName === '')
-        await inquirer
-            .prompt([...inquirerContractNameInput, ...inquirerInitializer, ...inquirerExtra])
-            .then(async (answers) => runDeployProxy(cd, answers))
-            .catch((err: any) => {
-                console.log(err)
-            })
-            .finally(() => process.exit(0))
-    else await runDeployProxy(cd, args)
+    await runInteractive(args, [...inquirerContractNameInput, ...inquirerInitializer, ...inquirerExtra], (answers) =>
+        runDeployProxy(cd, answers)
+    )
 }
 
 const serveUpgradeTask = async (args: any, cd: ContractDeployment) => {
-    if (!args.contractName || args.contractName === '')
-        await inquirer
-            .prompt([...inquirerContractNameInput, ...inquirerExtra])
-            .then(async (answers) => runUpgradeProxy(cd, answers))
-            .catch((err: any) => {
-                console.log(err)
-            })
-            .finally(() => process.exit(0))
-    else await runUpgradeProxy(cd, args)
+    await runInteractive(args, [...inquirerContractNameInput, ...inquirerExtra], (answers) =>
+        runUpgradeProxy(cd, answers)
+    )
 }
 
 const serveDeployStaticTask = async (args: any, cd: ContractDeployment) => {
-    if (!args.contractName || args.contractName === '')
-        await inquirer
-            .prompt([...inquirerContractNameInput, ...inquirerConstructor, ...inquirerExtra])
-            .then(async (answers) => runDeployStatic(cd, answers))
-            .catch((err: any) => {
-                console.log(err)
-            })
-            .finally(() => process.exit(0))
-    else await runDeployStatic(cd, args)
+    await runInteractive(args, [...inquirerContractNameInput, ...inquirerConstructor, ...inquirerExtra], (answers) =>
+        runDeployStatic(cd, answers)
+    )
 }
 
 const serveTestTask = async (args: any, cd: ContractDeployment) => {
-    if (!args.contractName || args.contractName === '')
-        await inquirer
-            .prompt([...inquirerContractNameInput, ...inquirerInitializer, ...inquirerExtra])
-            .then(async (answers) => {
-                await runDeployProxy(cd, answers)
-                await runUpgradeProxy(cd, answers)
-            })
-            .catch((err: any) => {
-                console.log(err)
-            })
-            .finally(() => process.exit(0))
-    else {
-        await runDeployProxy(cd, args)
-        await runUpgradeProxy(cd, args)
-    }
+    await runInteractive(
+        args,
+        [...inquirerContractNameInput, ...inquirerInitializer, ...inquirerExtra],
+        async (answers) => {
+            await runDeployProxy(cd, answers)
+            await runUpgradeProxy(cd, answers)
+        }
+    )
 }
+
+/**
+ * Tasks surfaced by the interactive menu when the `deployment` task runs
+ * with no CLI args. Kept in sync with the dispatch table in
+ * {@link serveFunction} and the task registry in `src/index.ts`. Exported
+ * so tests can assert the menu stays complete (issue #101, which
+ * originally omitted `deploy-contract-static`).
+ */
+export const INTERACTIVE_CHOICES = [
+    'deploy-contract',
+    'upgrade-contract',
+    'deploy-contract-static',
+    'test-deploy-then-upgrade-contract'
+] as const
 
 const serveCLI = async (task: string) => {
     if (task === '')
@@ -180,7 +213,7 @@ const serveCLI = async (task: string) => {
                     type: 'list',
                     name: 'action',
                     message: 'What do you want to do?',
-                    choices: ['deploy-contract', 'upgrade-contract', 'test-deploy-then-upgrade-contract']
+                    choices: [...INTERACTIVE_CHOICES]
                 }
             ])
         ).action
@@ -195,8 +228,14 @@ const serveFunction = async (task: string, args: any, cd: ContractDeployment) =>
     if (action === 'test-deploy-then-upgrade-contract') await serveTestTask(args, cd)
 }
 
+/**
+ * Banner printed when an interactive prompt is about to run. Matches the
+ * published package name `deployment-tool` (issue #101).
+ */
+export const INTERACTIVE_BANNER = 'Deployment tools for deployment-tool'
+
 const serveTasks = async (task: string, args: any, cd: ContractDeployment) => {
-    console.log(`Deployment tools for Gluwa\n`)
+    console.log(`${INTERACTIVE_BANNER}\n`)
     return serveFunction(task, args, cd)
 }
 
