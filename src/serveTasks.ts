@@ -156,7 +156,12 @@ const runUpgradeProxy = async (cd: ContractDeployment, args: any) => {
         // previous `?? false` masked the default and silently disabled
         // verification on CLI/invocations without `--verify-contract`
         // (issue #97).
-        parseBooleanArg(args.verifyContract)
+        parseBooleanArg(args.verifyContract),
+        // Explicit proxy address or "from" contract name lets the upgrade
+        // resolve the existing proxy without pre-seeding the address book
+        // under the new contract name (issue #99).
+        args.proxy || undefined,
+        args.from || undefined
     )
 }
 

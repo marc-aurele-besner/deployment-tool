@@ -99,11 +99,24 @@ hardhat deploy-contract \
 ```
 hardhat upgrade-contract \
     --contract-name <string> \
+    --proxy <address> \
+    --from <previous-name> \
     --tag <string> \
     --extra <string> \
     --skip-git <true|false> \
     --verify-contract <true|false>
 ```
+
+- `--proxy <address>` upgrades the proxy at the given address directly,
+  skipping the address-book lookup. Use this when you already know the
+  proxy address and want to avoid seeding the address book under the new
+  contract name.
+- `--from <previous-name>` resolves the proxy address via
+  `addressBook.retrieveContract(from, network)` so a renamed upgrade
+  (e.g. `GreeterV1` → `GreeterV2`) finds the existing V1 proxy without
+  manually saving a V2 → V1-address entry first. When neither `--proxy`
+  nor `--from` is supplied the upgrade looks up `--contract-name` in the
+  address book (the legacy behavior).
 
 ### `deploy-contract-static`
 
@@ -171,7 +184,9 @@ cd.upgradeContract(
     tag?: string,
     extra?: any,
     skipGit?: boolean,
-    verify?: boolean
+    verify?: boolean,
+    proxyAddress?: string,
+    fromContractName?: string
 )
 
 cd.testDeployThenUpgradeContract(
@@ -181,7 +196,9 @@ cd.testDeployThenUpgradeContract(
     tag?: string,
     extra?: any,
     skipGit?: boolean,
-    verify?: boolean
+    verify?: boolean,
+    proxyAddress?: string,
+    fromContractName?: string
 )
 
 cd.deployContractStatic(

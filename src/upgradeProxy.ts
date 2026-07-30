@@ -21,6 +21,17 @@ import type { NetworkConnection } from 'hardhat/types/network'
  *   view of that contract — verify on by default matches `deployProxy`'s
  *   default (issue #97). Pass `false` to skip verification (e.g. on
  *   networks that have no configured Etherscan key).
+ * @param proxyAddress Optional explicit proxy address to upgrade. When
+ *   provided, the address-book lookup is skipped entirely — useful when the
+ *   caller already knows the proxy address (e.g. from a previous deploy
+ *   result) and avoids having to seed the address book under the new
+ *   contract name (issue #99).
+ * @param fromContractName Optional name of the previous contract version
+ *   whose recorded address-book entry holds the proxy. When provided, the
+ *   proxy address is resolved via `addressBook.retrieveContract(from,
+ *   network)` instead of looking the new `contractName` up. Lets users
+ *   upgrade `GreeterV1` → `GreeterV2` without manually seeding the
+ *   address book with a V2 → V1-address entry first (issue #99).
  */
 export const upgradeProxy = async (
     connection: NetworkConnection,
@@ -30,7 +41,9 @@ export const upgradeProxy = async (
     tag?: string,
     extra?: any,
     skipGit = false as boolean,
-    verifyContractFlag = true as boolean
+    verifyContractFlag = true as boolean,
+    proxyAddress?: string,
+    fromContractName?: string
 ): Promise<{
     success: boolean
     message: string
@@ -59,8 +72,29 @@ export const upgradeProxy = async (
         const [deployer] = await connection.ethers.getSigners()
         const contractInterface = await connection.ethers.getContractFactory(contractName)
 
-        const contractAddress = addressBook.retrieveContract(contractName, connection.networkName)
-        if (!contractAddress) throw new Error(`Contract ${contractName} not found in address book`)
+        // Resolve the proxy address with the precedence: explicit
+        // `proxyAddress` > address-book lookup under `fromContractName` >
+        // address-book lookup under `contractName` (issue #99). Without
+        // `fromContractName` the upgrade of a renamed contract still
+        // requires the caller to have seeded the address book under the
+        // new name pointing at the old proxy address; supplying `from`
+        // (or `proxyAddress`) lets the upgrade find the existing proxy
+        // without that pre-seeding step.
+        let contractAddress: string | undefined
+        if (proxyAddress) {
+            contractAddress = proxyAddress
+        } else if (fromContractName) {
+            contractAddress = addressBook.retrieveContract(fromContractName, connection.networkName)
+        } else {
+            contractAddress = addressBook.retrieveContract(contractName, connection.networkName)
+        }
+        if (!contractAddress) {
+            const lookupTarget = fromContractName ?? contractName
+            throw new Error(
+                `Contract ${lookupTarget} not found in address book` +
+                    (proxyAddress ? '' : ' — pass an explicit --proxy address or --from <previous-name>')
+            )
+        }
 
         const upgrades = await upgradesFactory(hre, connection)
         upgradedContract = await upgrades.upgradeProxy(contractAddress, contractInterface)

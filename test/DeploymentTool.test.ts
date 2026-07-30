@@ -257,6 +257,139 @@ describe('deployment-tool plugin', function () {
             assert.match(upgraded.message, /Upgrade failed/)
         })
 
+        // Issue #99: upgrading GreeterV1 -> GreeterV2 used to require
+        // manually saving the V2 name mapped to the V1 proxy address in
+        // the address book before calling upgradeContract('GreeterV2').
+        // The `from` option lets the caller point at the previous contract
+        // name so the address-book lookup finds the V1 proxy without that
+        // manual seeding step.
+        it('upgrades via --from without pre-seeding the address book (issue #99)', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const deployed = await cd.deployContract(
+                'GreeterV1',
+                ['original'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            assert.equal(deployed.success, true)
+            const proxyAddress = deployed.proxyAddress!
+            assert.match(proxyAddress, /^0x[0-9a-fA-F]{40}$/)
+
+            // No pre-seeding: only the V1 entry should exist. Confirm
+            // GreeterV2 is absent before the upgrade so we know the
+            // success below is from `from: 'GreeterV1'` resolving the
+            // proxy, not from a leftover seed.
+            assert.equal(
+                book.book.retrieveContract('GreeterV2', connection.networkName),
+                '',
+                'GreeterV2 must not be in the address book before the upgrade'
+            )
+
+            const upgraded = await cd.upgradeContract(
+                'GreeterV2',
+                undefined,
+                undefined,
+                true,
+                false,
+                undefined,
+                'GreeterV1'
+            )
+            assert.equal(upgraded.success, true)
+            assert.equal(upgraded.proxyAddress, proxyAddress, 'proxy address must be unchanged')
+            assert.equal(upgraded.contractName, 'GreeterV2')
+
+            // The upgrade must save the new name (GreeterV2) under the
+            // same proxy address so subsequent lookups succeed.
+            assert.equal(
+                book.book.retrieveContract('GreeterV2', connection.networkName),
+                proxyAddress
+            )
+
+            const GreeterV2 = await connection.ethers.getContractFactory('GreeterV2')
+            const proxied = GreeterV2.attach(proxyAddress)
+            assert.equal(await proxied.greeting(), 'original')
+            assert.equal(await proxied.version(), 'V2')
+        })
+
+        it('upgrades via an explicit --proxy address without an address-book entry (issue #99)', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const deployed = await cd.deployContract(
+                'GreeterV1',
+                ['explicit'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            assert.equal(deployed.success, true)
+            const proxyAddress = deployed.proxyAddress!
+
+            // Wipe any pre-existing V2 entry so the upgrade can only
+            // succeed via the explicit proxy address.
+            book.book.saveContract('GreeterV2', '', connection.networkName, '')
+
+            const upgraded = await cd.upgradeContract(
+                'GreeterV2',
+                undefined,
+                undefined,
+                true,
+                false,
+                proxyAddress
+            )
+            assert.equal(upgraded.success, true)
+            assert.equal(upgraded.proxyAddress, proxyAddress)
+            assert.equal(upgraded.contractName, 'GreeterV2')
+
+            const GreeterV2 = await connection.ethers.getContractFactory('GreeterV2')
+            const proxied = GreeterV2.attach(proxyAddress)
+            assert.equal(await proxied.version(), 'V2')
+        })
+
+        it('prefers --proxy over --from and --contract-name when resolving the proxy address (issue #99)', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const deployed = await cd.deployContract(
+                'GreeterV1',
+                ['precedence'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            const realProxyAddress = deployed.proxyAddress!
+
+            // Seed a misleading V2 entry under a different address — if
+            // --from / --contract-name takes precedence over --proxy the
+            // upgrade would target this bogus address and fail.
+            const bogusAddress = '0x0000000000000000000000000000000000000bbb'
+            book.book.saveContract('GreeterV2', bogusAddress, connection.networkName, '')
+
+            const upgraded = await cd.upgradeContract(
+                'GreeterV2',
+                undefined,
+                undefined,
+                true,
+                false,
+                realProxyAddress,
+                'GreeterV1'
+            )
+            assert.equal(upgraded.success, true)
+            assert.equal(upgraded.proxyAddress, realProxyAddress, 'proxy resolution must use --proxy first')
+        })
+
+        it('reports failure when neither --proxy, --from, nor an address-book entry resolves a contract (issue #99)', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            // No deploy, no address-book entries — neither --proxy nor
+            // --from is set, so the lookup under --contract-name fails.
+            const upgraded = await cd.upgradeContract('MissingV1', undefined, undefined, true, false)
+            assert.equal(upgraded.success, false)
+            assert.match(upgraded.message, /Upgrade failed/)
+        })
+
         it('rotates the implementation address to a new one on upgrade', async function () {
             // The upgrade flow re-resolves the implementation address after
             // upgradeProxy and forwards it to Etherscan. Verify the slot

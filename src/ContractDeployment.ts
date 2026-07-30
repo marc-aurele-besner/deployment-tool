@@ -54,9 +54,34 @@ export class ContractDeployment {
      * `false` to skip Etherscan verification. Aligning the default with
      * {@link deployContract} ensures an upgrade verifies by default — both
      * proxy and new implementation are submitted to Etherscan (issue #97).
+     *
+     * `proxyAddress` and `fromContractName` are forwarded to
+     * {@link upgradeProxy} so callers upgrading a renamed contract (e.g.
+     * `GreeterV1` → `GreeterV2`) can supply either the explicit proxy
+     * address or the previous contract name without pre-seeding the
+     * address book (issue #99).
      */
-    public async upgradeContract(contractName: string, tag?: string, extra?: any, skipGit?: boolean, verify?: boolean) {
-        return upgradeProxy(this.connection, this.addressBook, this.hre, contractName, tag, extra, skipGit, verify)
+    public async upgradeContract(
+        contractName: string,
+        tag?: string,
+        extra?: any,
+        skipGit?: boolean,
+        verify?: boolean,
+        proxyAddress?: string,
+        fromContractName?: string
+    ) {
+        return upgradeProxy(
+            this.connection,
+            this.addressBook,
+            this.hre,
+            contractName,
+            tag,
+            extra,
+            skipGit,
+            verify,
+            proxyAddress,
+            fromContractName
+        )
     }
 
     public async testDeployThenUpgradeContract(
@@ -66,7 +91,9 @@ export class ContractDeployment {
         tag?: string,
         extra?: any,
         skipGit?: boolean,
-        verify?: boolean
+        verify?: boolean,
+        proxyAddress?: string,
+        fromContractName?: string
     ) {
         const deployed = await deployProxy(
             this.connection,
@@ -88,7 +115,9 @@ export class ContractDeployment {
             tag,
             extra,
             skipGit,
-            verify
+            verify,
+            proxyAddress,
+            fromContractName
         )
         // The deployment-tool API treats this as a single result; if either
         // step succeeded, surface it as success so callers can branch on the
