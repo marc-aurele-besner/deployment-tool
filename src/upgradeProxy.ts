@@ -34,7 +34,17 @@ export const upgradeProxy = async (
         let upgradedContract: any = null
         let ProxyAdminAddress: string = ''
 
-        await compileContract(connection, hre)
+        // Build contracts. If the build fails, abort before sending any
+        // upgrade transaction — a broken implementation would brick the
+        // proxy.
+        const compiled = await compileContract(connection, hre)
+        if (!compiled) {
+            return {
+                success: false,
+                message: 'Compilation failed',
+                error: 'Contracts failed to build; aborting upgrade before sending transactions.'
+            } as any
+        }
 
         const [deployer] = await connection.ethers.getSigners()
         const contractInterface = await connection.ethers.getContractFactory(contractName)

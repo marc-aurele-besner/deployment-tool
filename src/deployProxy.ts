@@ -37,8 +37,17 @@ export const deployProxy = async (
         let deployedContract: any = null
         let ProxyAdminAddress: string = ''
 
-        // Build contracts.
-        await compileContract(connection, hre)
+        // Build contracts. If the build fails, abort before signing or
+        // sending any transactions — see `compileContract` for the warning
+        // contract.
+        const compiled = await compileContract(connection, hre)
+        if (!compiled) {
+            return {
+                success: false,
+                message: 'Compilation failed',
+                error: 'Contracts failed to build; aborting deployment before sending transactions.'
+            } as any
+        }
 
         // Get deployer account.
         const [deployer] = await connection.ethers.getSigners()

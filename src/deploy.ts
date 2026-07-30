@@ -34,8 +34,18 @@ export const deploy = async (
         const logOutput: Array<{ contractName: string; address: string; network: string }> = []
         let deployedContract: any = null
 
-        // Build contracts (no-op if already up-to-date).
-        await compileContract(connection, hre)
+        // Build contracts (no-op if already up-to-date). If the build fails
+        // we must abort before touching the chain — `compileContract` only
+        // logs the error and returns `false`, so callers need to opt in to
+        // the failure here.
+        const compiled = await compileContract(connection, hre)
+        if (!compiled) {
+            return {
+                success: false,
+                message: 'Compilation failed',
+                error: 'Contracts failed to build; aborting deployment before sending transactions.'
+            }
+        }
 
         // Get deployer account.
         const [deployer] = await connection.ethers.getSigners()

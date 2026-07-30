@@ -324,4 +324,83 @@ describe('deployment-tool plugin', function () {
             assert.equal(await onChain.label(), 'my-label')
         })
     })
+
+    // Regression coverage for #98: when `hardhat build` fails the deploy
+    // / upgrade flows must abort before signing transactions, not silently
+    // continue with stale artifacts. We drop a deliberately broken Solidty
+    // file into `contracts/` for the duration of this block and make sure
+    // it is removed afterwards so the rest of the suite can compile again.
+    describe('compile failure handling', function () {
+        const brokenContractPath = path.join('contracts', '__BrokenForCompileTest.sol')
+        const brokenContractSource = `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+contract __BrokenForCompileTest {
+    this is not valid solidity;
+}
+`
+
+        this.timeout(120_000)
+
+        before(function () {
+            fs.writeFileSync(brokenContractPath, brokenContractSource)
+        })
+
+        after(function () {
+            try {
+                fs.unlinkSync(brokenContractPath)
+            } catch {
+                /* best-effort cleanup */
+            }
+        })
+
+        it('aborts deployContractStatic with success: false when contracts fail to build', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const result = await cd.deployContractStatic('GreeterV1', ['hello'], undefined, undefined, true, false)
+
+            assert.equal(result.success, false)
+            assert.equal(result.message, 'Compilation failed')
+            assert.match(result.error!, /aborting deployment/)
+            assert.equal(result.contract, undefined, 'no contract instance should be returned')
+            assert.equal(result.address, undefined, 'no address should be returned')
+        })
+
+        it('aborts deployContract (proxy) with success: false when contracts fail to build', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const result = await cd.deployContract(
+                'GreeterV1',
+                ['hello'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+
+            assert.equal(result.success, false)
+            assert.equal(result.message, 'Compilation failed')
+            assert.match(result.error!, /aborting deployment/)
+            assert.equal(result.contract, undefined, 'no proxy instance should be returned')
+            assert.equal(result.proxyAddress, undefined, 'no proxy address should be returned')
+        })
+
+        it('aborts upgradeContract with success: false when contracts fail to build', async function () {
+            // Pre-seed the address book so the upgrade flow passes the
+            // "not in address book" check and the abort comes from the
+            // compile failure, not the lookup.
+            book.book.saveContract(
+                'GreeterV2',
+                '0x0000000000000000000000000000000000000000',
+                connection.networkName,
+                ''
+            )
+
+            const cd = createContractDeployment(hre, connection, book.book)
+            const result = await cd.upgradeContract('GreeterV2', undefined, undefined, true, false)
+
+            assert.equal(result.success, false)
+            assert.equal(result.message, 'Compilation failed')
+            assert.match(result.error!, /aborting upgrade/)
+            assert.equal(result.contract, undefined, 'no upgraded contract should be returned')
+        })
+    })
 })
