@@ -2,6 +2,26 @@ import inquirer from 'inquirer'
 
 import type { ContractDeployment } from './ContractDeployment.js'
 
+/**
+ * Parse a CLI option value (typically a string from `--skip-git false`) into
+ * a strict boolean. Accepts only 'true' / 'false' (case-insensitive, trimmed);
+ * anything else — including the empty default `''` from `addOption` and
+ * `undefined` when the option is omitted — resolves to `undefined` so the
+ * caller can fall back to a sensible downstream default.
+ *
+ * Replaces the previous `value && value === 'true' ? true : !!value` trick,
+ * which incorrectly mapped the literal string 'false' to `true` because
+ * `!!'false'` is `true` (issue #94).
+ */
+export const parseBooleanArg = (value: unknown): boolean | undefined => {
+    if (typeof value === 'boolean') return value
+    if (value === undefined || value === null) return undefined
+    const normalized = String(value).trim().toLowerCase()
+    if (normalized === 'true') return true
+    if (normalized === 'false') return false
+    return undefined
+}
+
 const inquirerContractNameInput = [
     {
         type: 'input',
@@ -61,8 +81,8 @@ const runDeployProxy = async (cd: ContractDeployment, args: any) => {
         initializeSignature,
         args.tag,
         args.extra,
-        args.skipGit && args.skipGit === 'true' ? true : !!args.skipGit,
-        args.verifyContract && args.verifyContract === 'true' ? true : !!args.verifyContract
+        parseBooleanArg(args.skipGit) ?? false,
+        parseBooleanArg(args.verifyContract) ?? false
     )
 }
 
@@ -71,8 +91,8 @@ const runUpgradeProxy = async (cd: ContractDeployment, args: any) => {
         args.contractName,
         args.tag,
         args.extra,
-        args.skipGit && args.skipGit === 'true' ? true : !!args.skipGit,
-        args.verifyContract && args.verifyContract === 'true' ? true : !!args.verifyContract
+        parseBooleanArg(args.skipGit) ?? false,
+        parseBooleanArg(args.verifyContract) ?? false
     )
 }
 
@@ -83,8 +103,8 @@ const runDeployStatic = async (cd: ContractDeployment, args: any) => {
         constructorArguments,
         args.tag,
         args.extra,
-        args.skipGit && args.skipGit === 'true' ? true : !!args.skipGit,
-        args.verifyContract && args.verifyContract === 'true' ? true : !!args.verifyContract
+        parseBooleanArg(args.skipGit) ?? false,
+        parseBooleanArg(args.verifyContract) ?? false
     )
 }
 
