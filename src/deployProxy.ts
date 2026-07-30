@@ -94,6 +94,19 @@ export const deployProxy = async (
             ProxyAdminAddress = addressBook.retrieveOZAdminProxyContract(
                 connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0
             )
+        } catch (error) {
+            console.log('Error retrieving Proxy Admin Address from address book: ', error)
+        }
+
+        if (!ProxyAdminAddress) {
+            try {
+                ProxyAdminAddress = await upgrades.erc1967.getAdminAddress(deployedContract.target as string)
+            } catch (error) {
+                console.log('Error retrieving Proxy Admin Address on-chain: ', error)
+            }
+        }
+
+        if (ProxyAdminAddress) {
             addressBook.saveContract('ProxyAdmin', ProxyAdminAddress, connection.networkName, deployer.address)
             logOutput.push({
                 contractName: 'ProxyAdmin',
@@ -101,8 +114,8 @@ export const deployProxy = async (
                 network: connection.networkName
             })
             console.log('Deployed using Proxy Admin contract address: ', ProxyAdminAddress)
-        } catch (error) {
-            console.log('Error retrieving Proxy Admin Address: ', error)
+        } else {
+            console.log('Warning: could not determine Proxy Admin contract address')
         }
 
         if (verifyContractFlag) await etherscanVerifyContract(hre, deployedContract.target as string)
