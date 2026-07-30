@@ -19,6 +19,19 @@ jobs:
           node-version: '24'
           cache: 'npm'
 
+      - name: Verify package.json and package-lock.json versions match
+        # Catches the drift that previously shipped 0.2.0 in package.json with
+        # a stale lockfile, leaving npm serving the old Hardhat 2 plugin.
+        # Run `npm install` to resync the lockfile if this fails.
+        run: |
+          pkg_version="$(node -p "require('./package.json').version")"
+          lock_version="$(node -p "require('./package-lock.json').version")"
+          if [ "$pkg_version" != "$lock_version" ]; then
+            echo "::error::package.json version ($pkg_version) does not match package-lock.json version ($lock_version). Run 'npm install' to sync the lockfile."
+            exit 1
+          fi
+          echo "package.json and package-lock.json are both at version $pkg_version"
+
       - name: Install dependencies
         run: npm ci
 
