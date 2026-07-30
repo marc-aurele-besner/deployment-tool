@@ -154,7 +154,7 @@ Hardhat 3 removed the `extendEnvironment` hook this plugin used in Hardhat 2, so
 
 ```ts
 import hre from 'hardhat'
-import { createContractDeployment } from 'deployment-tool/dist/lib.js'
+import { createContractDeployment } from 'deployment-tool'
 
 const connection = await hre.network.connect()
 const cd = createContractDeployment(hre, connection)
