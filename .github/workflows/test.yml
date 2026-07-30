@@ -75,6 +75,9 @@ jobs:
 
       - name: Build and pack the package
         run: |
+          # `npm pack` does not run a build (only `prepublishOnly` does, on
+          # publish), and dist/ is gitignored, so build explicitly first.
+          npm run build
           mkdir -p "$RUNNER_TEMP/pack"
           npm pack --pack-destination "$RUNNER_TEMP/pack"
           tarball="$(find "$RUNNER_TEMP/pack" -maxdepth 1 -name '*.tgz' | head -n 1)"
