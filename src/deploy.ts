@@ -11,6 +11,16 @@ import {
 import type { NetworkConnection } from 'hardhat/types/network'
 import type { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
 
+/**
+ * Deploy a non-upgradeable contract, save the address, optionally verify
+ * it on Etherscan, and record the deployment.
+ *
+ * @param verifyContract Whether to verify the deployed contract on
+ *   Etherscan. Defaults to `true` so a freshly deployed contract is visible
+ *   on block explorers; matches `deployProxy` and `upgradeProxy` (issue
+ *   #97). Pass `false` to skip verification (e.g. on networks that have no
+ *   configured Etherscan key).
+ */
 export const deploy = async (
     connection: NetworkConnection,
     addressBook: AwesomeAddressBook,

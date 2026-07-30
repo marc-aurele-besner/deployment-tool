@@ -288,6 +288,129 @@ describe('deployment-tool plugin', function () {
         })
     })
 
+    // Issue #97: `upgradeProxy` used to declare `verifyContractFlag?: boolean`
+    // (undefined default), so `if (verifyContractFlag)` was falsy and every
+    // upgrade that didn't pass the flag explicitly skipped Etherscan
+    // verification — silently diverging from `deployProxy` / `deploy`. The
+    // fix changes the default to `true`. These tests pin the new behaviour:
+    // omitting `verifyContractFlag` (or letting the `ContractDeployment`
+    // wrapper forward `undefined`) must enter the verification branch.
+    describe('verifyContract default (issue #97)', function () {
+        // The verification branch calls `etherscanVerifyContract`, which on
+        // the local hardhat network can't actually publish to Etherscan and
+        // logs an error via `console.log` instead of throwing. Either a
+        // success log or an error log proves the verify branch ran.
+        const captureConsoleLog = () => {
+            const messages: string[] = []
+            const original = console.log
+            console.log = (...args: unknown[]) => {
+                messages.push(args.map((a) => (typeof a === 'string' ? a : String(a))).join(' '))
+                return original.apply(console, args as any)
+            }
+            return {
+                messages,
+                restore: () => {
+                    console.log = original
+                }
+            }
+        }
+
+        const verifyBranchEntered = (messages: string[]) =>
+            messages.some(
+                (m) => m.includes('has been verified on etherscan.io') || m.includes('Error verifying contract')
+            )
+
+        it('upgradeProxy enters the verification branch when verifyContractFlag is undefined', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const deployed = await cd.deployContract(
+                'GreeterV1',
+                ['default-flag'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            assert.equal(deployed.success, true)
+            const proxyAddress = deployed.proxyAddress!
+            book.book.saveContract('GreeterV2', proxyAddress, connection.networkName, '')
+
+            const capture = captureConsoleLog()
+            try {
+                // Forward `undefined` for verifyContractFlag — the function
+                // signature must now default to `true` (issue #97).
+                const upgraded = await cd.upgradeContract('GreeterV2', undefined, undefined, true, undefined)
+                assert.equal(upgraded.success, true)
+            } finally {
+                capture.restore()
+            }
+
+            assert.ok(
+                verifyBranchEntered(capture.messages),
+                'upgradeProxy should attempt verification when verifyContractFlag is omitted'
+            )
+        })
+
+        it('upgradeProxy skips the verification branch when verifyContractFlag is false', async function () {
+            // Regression guard for the explicit `false` path — must still
+            // skip verification regardless of the new default.
+            const cd = createContractDeployment(hre, connection, book.book)
+            const deployed = await cd.deployContract(
+                'GreeterV1',
+                ['explicit-false'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            const proxyAddress = deployed.proxyAddress!
+            book.book.saveContract('GreeterV2', proxyAddress, connection.networkName, '')
+
+            const capture = captureConsoleLog()
+            try {
+                const upgraded = await cd.upgradeContract('GreeterV2', undefined, undefined, true, false)
+                assert.equal(upgraded.success, true)
+            } finally {
+                capture.restore()
+            }
+
+            assert.equal(
+                verifyBranchEntered(capture.messages),
+                false,
+                'upgradeProxy must skip verification when verifyContractFlag is explicitly false'
+            )
+        })
+
+        it('deployProxy enters the verification branch when verifyContractFlag is undefined', async function () {
+            // The deploy path already defaulted to `true` before the fix;
+            // this pins that behaviour so a future refactor can't
+            // accidentally regress it back to the upgrade bug.
+            const cd = createContractDeployment(hre, connection, book.book)
+
+            const capture = captureConsoleLog()
+            try {
+                const result = await cd.deployContract(
+                    'GreeterV1',
+                    ['default-flag-deploy'],
+                    'initialize',
+                    undefined,
+                    undefined,
+                    true,
+                    undefined
+                )
+                assert.equal(result.success, true)
+            } finally {
+                capture.restore()
+            }
+
+            assert.ok(
+                verifyBranchEntered(capture.messages),
+                'deployProxy should attempt verification when verifyContractFlag is omitted'
+            )
+        })
+    })
+
     describe('testDeployThenUpgradeContract', function () {
         it('deploys then performs a same-name upgrade round-trip', async function () {
             const cd = createContractDeployment(hre, connection, book.book)

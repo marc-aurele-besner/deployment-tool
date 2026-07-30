@@ -82,7 +82,12 @@ const runDeployProxy = async (cd: ContractDeployment, args: any) => {
         args.tag,
         args.extra,
         parseBooleanArg(args.skipGit) ?? false,
-        parseBooleanArg(args.verifyContract) ?? false
+        // Forward `undefined` when the flag is omitted so the underlying
+        // `deployProxy` default (`verifyContractFlag = true`) applies; the
+        // previous `?? false` masked the default and silently disabled
+        // verification on CLI/invocations without `--verify-contract`
+        // (issue #97).
+        parseBooleanArg(args.verifyContract)
     )
 }
 
@@ -92,7 +97,12 @@ const runUpgradeProxy = async (cd: ContractDeployment, args: any) => {
         args.tag,
         args.extra,
         parseBooleanArg(args.skipGit) ?? false,
-        parseBooleanArg(args.verifyContract) ?? false
+        // Forward `undefined` when the flag is omitted so the underlying
+        // `upgradeProxy` default (`verifyContractFlag = true`) applies; the
+        // previous `?? false` masked the default and silently disabled
+        // verification on CLI/invocations without `--verify-contract`
+        // (issue #97).
+        parseBooleanArg(args.verifyContract)
     )
 }
 
@@ -104,7 +114,7 @@ const runDeployStatic = async (cd: ContractDeployment, args: any) => {
         args.tag,
         args.extra,
         parseBooleanArg(args.skipGit) ?? false,
-        parseBooleanArg(args.verifyContract) ?? false
+        parseBooleanArg(args.verifyContract)
     )
 }
 
