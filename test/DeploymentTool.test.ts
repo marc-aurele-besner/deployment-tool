@@ -190,6 +190,30 @@ describe('deployment-tool plugin', function () {
             assert.equal(result.success, true)
             assert.equal(await result.contract.greeting(), 'howdy')
         })
+
+        it('exposes a retrievable implementation address distinct from the proxy', async function () {
+            // The deployment flow looks up the implementation contract via the
+            // ERC-1967 slot when `verify` is true and forwards it to Etherscan.
+            // Make sure the lookup is wired up correctly: after a deploy the
+            // implementation address should resolve, look like an address, and
+            // not equal the proxy.
+            const cd = createContractDeployment(hre, connection, book.book)
+            const result = await cd.deployContract(
+                'GreeterV1',
+                ['hello'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            assert.equal(result.success, true)
+
+            const upgrades = await upgradesFactory(hre, connection)
+            const implementationAddress = await upgrades.erc1967.getImplementationAddress(result.proxyAddress!)
+            assert.match(implementationAddress, /^0x[0-9a-fA-F]{40}$/)
+            assert.notEqual(implementationAddress.toLowerCase(), result.proxyAddress!.toLowerCase())
+        })
     })
 
     describe('upgradeContract', function () {
@@ -231,6 +255,36 @@ describe('deployment-tool plugin', function () {
             const upgraded = await cd.upgradeContract('GreeterV1', undefined, undefined, true, false)
             assert.equal(upgraded.success, false)
             assert.match(upgraded.message, /Upgrade failed/)
+        })
+
+        it('rotates the implementation address to a new one on upgrade', async function () {
+            // The upgrade flow re-resolves the implementation address after
+            // upgradeProxy and forwards it to Etherscan. Verify the slot
+            // changes (so the verification call would actually verify the
+            // new logic, not the old one).
+            const cd = createContractDeployment(hre, connection, book.book)
+            const deployed = await cd.deployContract(
+                'GreeterV1',
+                ['original'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            const proxyAddress = deployed.proxyAddress!
+            book.book.saveContract('GreeterV2', proxyAddress, connection.networkName, '')
+
+            const upgrades = await upgradesFactory(hre, connection)
+            const implBefore = await upgrades.erc1967.getImplementationAddress(proxyAddress)
+            assert.match(implBefore, /^0x[0-9a-fA-F]{40}$/)
+
+            const upgraded = await cd.upgradeContract('GreeterV2', undefined, undefined, true, false)
+            assert.equal(upgraded.success, true)
+
+            const implAfter = await upgrades.erc1967.getImplementationAddress(proxyAddress)
+            assert.match(implAfter, /^0x[0-9a-fA-F]{40}$/)
+            assert.notEqual(implAfter.toLowerCase(), implBefore.toLowerCase())
         })
     })
 
