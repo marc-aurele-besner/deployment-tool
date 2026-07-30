@@ -3,6 +3,7 @@ import fs from 'fs'
 import os from 'os'
 import path from 'path'
 
+import { upgrades as upgradesFactory } from '@openzeppelin/hardhat-upgrades'
 import { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
 import hre from 'hardhat'
 
@@ -120,6 +121,12 @@ describe('deployment-tool plugin', function () {
             assert.ok(result.proxyAddress, 'proxyAddress should be returned')
             assert.ok(result.contract, 'contract instance should be returned')
             assert.equal(result.proxyAddress, result.contract.target)
+            assert.ok(result.proxyAdminAddress, 'proxyAdminAddress should be returned')
+            assert.match(result.proxyAdminAddress!, /^0x[0-9a-fA-F]{40}$/)
+
+            const upgrades = await upgradesFactory(hre, connection)
+            const onChainAdmin = await upgrades.erc1967.getAdminAddress(result.proxyAddress!)
+            assert.equal(result.proxyAdminAddress!.toLowerCase(), onChainAdmin.toLowerCase())
 
             const greeting = await result.contract.greeting()
             assert.equal(greeting, 'hello')
@@ -129,6 +136,44 @@ describe('deployment-tool plugin', function () {
             const stored = book.readDeployed().find((c) => c.name === 'GreeterV1')
             assert.ok(stored, 'address book should have recorded the deployment')
             assert.equal(stored!.address, result.proxyAddress)
+
+            const storedAdmin = book.readDeployed().find((c) => c.name === 'ProxyAdmin')
+            assert.ok(storedAdmin, 'address book should have recorded the ProxyAdmin')
+            assert.equal(storedAdmin!.address.toLowerCase(), onChainAdmin.toLowerCase())
+        })
+
+        it('records the reused ProxyAdmin when deploying another proxy', async function () {
+            const cd = createContractDeployment(hre, connection, book.book)
+            const first = await cd.deployContract(
+                'GreeterV1',
+                ['first'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+            const second = await cd.deployContract(
+                'GreeterV1',
+                ['second'],
+                'initialize',
+                undefined,
+                undefined,
+                true,
+                false
+            )
+
+            assert.equal(first.success, true)
+            assert.equal(second.success, true)
+            assert.ok(second.proxyAdminAddress)
+
+            const upgrades = await upgradesFactory(hre, connection)
+            const onChainAdmin = await upgrades.erc1967.getAdminAddress(second.proxyAddress!)
+            assert.equal(second.proxyAdminAddress!.toLowerCase(), onChainAdmin.toLowerCase())
+
+            const storedAdmin = book.readDeployed().find((c) => c.name === 'ProxyAdmin')
+            assert.ok(storedAdmin, 'address book should retain the reused ProxyAdmin')
+            assert.equal(storedAdmin!.address.toLowerCase(), onChainAdmin.toLowerCase())
         })
 
         it('uses the provided initializer signature', async function () {
@@ -169,6 +214,8 @@ describe('deployment-tool plugin', function () {
             const upgraded = await cd.upgradeContract('GreeterV2', undefined, undefined, true, false)
             assert.equal(upgraded.success, true)
             assert.equal(upgraded.proxyAddress, proxyAddress, 'proxy address should be unchanged')
+            assert.ok(upgraded.proxyAdminAddress, 'proxyAdminAddress should be returned')
+            assert.equal(upgraded.proxyAdminAddress!.toLowerCase(), deployed.proxyAdminAddress!.toLowerCase())
 
             const GreeterV2 = await connection.ethers.getContractFactory('GreeterV2')
             const proxied = GreeterV2.attach(proxyAddress)

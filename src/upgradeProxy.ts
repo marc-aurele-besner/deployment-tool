@@ -71,9 +71,21 @@ export const upgradeProxy = async (
 
         console.log('\x1b[32m%s\x1b[0m', `${contractName} upgraded at address: `, upgradedContract.target as string)
 
-        ProxyAdminAddress = addressBook.retrieveOZAdminProxyContract(
-            connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0
-        )
+        try {
+            ProxyAdminAddress = addressBook.retrieveOZAdminProxyContract(
+                connection.networkConfig.chainId ? Number(connection.networkConfig.chainId) : 0
+            )
+        } catch (error) {
+            console.log('Error retrieving Proxy Admin Address from address book: ', error)
+        }
+
+        if (!ProxyAdminAddress) {
+            try {
+                ProxyAdminAddress = await upgrades.erc1967.getAdminAddress(upgradedContract.target as string)
+            } catch (error) {
+                console.log('Error retrieving Proxy Admin Address on-chain: ', error)
+            }
+        }
 
         if (verifyContractFlag) await etherscanVerifyContract(hre, upgradedContract.target as string)
 
