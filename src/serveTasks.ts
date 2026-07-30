@@ -22,6 +22,58 @@ export const parseBooleanArg = (value: unknown): boolean | undefined => {
     return undefined
 }
 
+/**
+ * Parse a CLI option value (typically `--initialize-arguments` or
+ * `--constructor-arguments`) into a typed `unknown[]` to forward to
+ * `deployContract` / `deployContractStatic`.
+ *
+ * Three input shapes are supported, picked by inspection:
+ *
+ * 1. Empty input — `undefined`, `null`, `''`, or whitespace-only — yields
+ *    `[]`. This matches the empty default emitted by Hardhat's `addOption`
+ *    and the current `args.x ? args.x.split(',') : []` behavior at the
+ *    call sites.
+ * 2. JSON input — a string whose first non-whitespace character is `[`
+ *    or `{` — is parsed via `JSON.parse` and returned. Arrays pass
+ *    through; a single object is wrapped in a one-element array so the
+ *    downstream `any[]` contract is always honored. Malformed JSON
+ *    throws a clear error that includes the offending input (issue #100).
+ * 3. Plain string input — anything else — keeps the legacy comma-split
+ *    so existing invocations such as `'Alice,Bob'` continue to work.
+ *
+ * Already-parsed values (programmatic invocation) are also accepted:
+ * arrays pass through, other primitives are wrapped in a one-element
+ * array, objects are wrapped in a one-element array.
+ */
+export const parseArgumentsArg = (value: unknown): unknown[] => {
+    if (value === undefined || value === null) return []
+    if (Array.isArray(value)) return value
+    if (typeof value === 'object') return [value]
+    if (typeof value !== 'string') return [value]
+
+    const trimmed = value.trim()
+    if (trimmed === '') return []
+
+    const first = trimmed[0]
+    if (first === '[' || first === '{') {
+        try {
+            const parsed = JSON.parse(trimmed)
+            if (Array.isArray(parsed)) return parsed
+            return [parsed]
+        } catch (err) {
+            const reason = err instanceof Error ? err.message : String(err)
+            throw new Error(
+                `Failed to parse arguments as JSON: ${reason}. ` +
+                    `Pass a JSON array (e.g. '["hello", 1, true]') or a JSON object ` +
+                    `wrapped in an array, or fall back to a plain comma-separated ` +
+                    `string list. Received: ${JSON.stringify(value)}`
+            )
+        }
+    }
+
+    return trimmed.split(',')
+}
+
 const inquirerContractNameInput = [
     {
         type: 'input',
@@ -39,7 +91,9 @@ const inquirerInitializer = [
     {
         type: 'input',
         name: 'initializeArguments',
-        message: 'What is the initialize() argument? (separate multiple arguments with a comma)'
+        message:
+            'What is the initialize() argument? ' +
+            '(JSON array like \'["hello", 1, true]\' for typed values, or comma-separated strings)'
     }
 ]
 const inquirerConstructor = [
@@ -74,7 +128,7 @@ const inquirerExtra = [
 
 const runDeployProxy = async (cd: ContractDeployment, args: any) => {
     const initializeSignature = args.initializeSignature ? args.initializeSignature : 'initialize'
-    const initializeArguments = args.initializeArguments ? args.initializeArguments.split(',') : []
+    const initializeArguments = parseArgumentsArg(args.initializeArguments)
     await cd.deployContract(
         args.contractName,
         initializeArguments,
@@ -107,7 +161,7 @@ const runUpgradeProxy = async (cd: ContractDeployment, args: any) => {
 }
 
 const runDeployStatic = async (cd: ContractDeployment, args: any) => {
-    const constructorArguments = args.constructorArguments ? args.constructorArguments.split(',') : []
+    const constructorArguments = parseArgumentsArg(args.constructorArguments)
     await cd.deployContractStatic(
         args.contractName,
         constructorArguments,
