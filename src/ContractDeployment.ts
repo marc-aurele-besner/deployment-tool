@@ -7,9 +7,10 @@ import type { HardhatRuntimeEnvironment } from 'hardhat/types/hre'
 import type { NetworkConnection } from 'hardhat/types/network'
 
 /**
- * Thin wrapper exposed to downstream Hardhat configs as
- * `hre.contractDeployment`. Construct one per task (Hardhat 3 makes a
- * new network connection per task invocation).
+ * Thin wrapper around the deploy / upgrade primitives, exposed to consumers
+ * via {@link createContractDeployment}. Construct one per task (Hardhat 3
+ * makes a new network connection per task invocation, so a single instance
+ * cannot be reused across tasks).
  */
 export class ContractDeployment {
     constructor(
