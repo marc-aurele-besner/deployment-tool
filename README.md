@@ -1,241 +1,243 @@
-
-[![license](https://img.shields.io/github/license/jamesisaac/react-native-background-task.svg)](https://opensource.org/licenses/MIT)
-[![npm version](https://badge.fury.io/js/deployment-tool.svg)](https://badge.fury.io/js/deployment-tool)
-
 # deployment-tool
 
+[![license](https://img.shields.io/github/license/marc-aurele-besner/deployment-tool.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://badge.fury.io/js/deployment-tool.svg)](https://badge.fury.io/js/deployment-tool)
+
+A Hardhat 3 plugin that adds tasks and a programmatic API to deploy and upgrade smart contracts.
+
+Each run will:
+
+1. Compile your contracts.
+2. Verify the storage layout and, when needed, deploy a proxy admin and an implementation contract.
+3. Use the first 8 characters of the current commit id as a version tag.
+4. Deploy a Transparent Upgradeable Proxy, or upgrade an existing proxy to the new implementation.
+5. Save the proxy address, proxy admin address, and initialization arguments.
+6. Verify the contract on Etherscan when verification is enabled (on by default).
+7. Commit the storage-layout and address files with a `<ContractName> @<commitId>` message, and `git pull --rebase && git push`.
+
+## Installation
+
+```bash
+npm install --save-dev deployment-tool \
+    hardhat \
+    @nomicfoundation/hardhat-ethers \
+    @nomicfoundation/hardhat-verify \
+    @openzeppelin/hardhat-upgrades \
+    hardhat-awesome-cli
 ```
 
-    888                888                                             888        888                   888 
-    888                888                                             888        888                   888 
-    888                888                                             888        888                   888 
-.d88888 .d88b. 88888b. 888 .d88b. 888  88888888b.d88b.  .d88b. 88888b. 888888     888888 .d88b.  .d88b. 888 
-d88" 888d8P  Y8b888 "88b888d88""88b888  888888 "888 "88bd8P  Y8b888 "88b888        888   d88""88bd88""88b888 
-888  88888888888888  888888888  888888  888888  888  88888888888888  888888  888888888   888  888888  888888 
-Y88b 888Y8b.    888 d88P888Y88..88PY88b 888888  888  888Y8b.    888  888Y88b.      Y88b. Y88..88PY88..88P888 
-"Y88888 "Y8888 88888P" 888 "Y88P"  "Y88888888  888  888 "Y8888 888  888 "Y888      "Y888 "Y88P"  "Y88P" 888 
-               888                     888                                                                  
-               888                Y8b d88P                                                                  
-               888                 "Y88P"                                                                   
+These are listed as `peerDependencies` and are **not** installed automatically.
 
+## Configuration
+
+Hardhat 3 is declarative — register the plugin in the `plugins` array of `hardhat.config.ts`. The recommended setup is:
+
+```ts
+import hardhatToolboxMochaEthersPlugin from '@nomicfoundation/hardhat-toolbox-mocha-ethers'
+import hardhatAwesomeCliPlugin from 'hardhat-awesome-cli/plugin'
+import ozUpgradesPlugin from '@openzeppelin/hardhat-upgrades'
+import { defineConfig } from 'hardhat/config'
+import deploymentToolPlugin from 'deployment-tool'
+
+export default defineConfig({
+    plugins: [
+        hardhatToolboxMochaEthersPlugin,
+        ozUpgradesPlugin,
+        hardhatAwesomeCliPlugin,
+        deploymentToolPlugin
+    ],
+    solidity: { profiles: { default: { version: '0.8.20' } } }
+})
 ```
 
-This Hardhat plugin add 4 tasks and 3 functions to deploy and upgrade smart contracts.
+You can also point the deployment folder elsewhere:
 
-Step include : 
-- Compile your contracts
-- Verify storage layout, deploy a proxy admin if non existent, deploy implementation contract if non existent
-- Get last commit id (8 first characters)
-- Deploy a Transparent Upgradeable Proxy OR Upgrade Proxy using implementation contract
-- Save address of the Proxy, Proxy Admin address and initialize arguments
-- Verify contract on etherscan.io (if selected)
-- Commit new storage layout file and address file with Contract Name and CommitId in commit msg
-- Git Pull & Push
-
-## How to install this package
-### 1. Install this package
-With NPM
-```
-npm install deployment-tool
-```
-Or with Yarn
-```
-yarn add deployment-tool
+```ts
+export default defineConfig({
+    paths: { deployment: 'deploy' }, // resolved relative to the Hardhat root
+    plugins: [/* ... */]
+})
 ```
 
-### 2. Import/Require this package in your hardhat.config.js/.ts
-
-Inside inside hardhat.config.js
-```
-require("deployment-tool");
-```
-or inside hardhat.config.ts (Typescript)
-```
-import 'deployment-tool'
-```
-    
-
- - [.npmignore](./.npmignore)
- - [.prettierignore](./.prettierignore)
- - [.prettierrc](./.prettierrc)
- - [CONTRIBUTING.md](./CONTRIBUTING.md)
- - [LICENSE](./LICENSE)
- - [README3.md](./README3.md)
- - [awesome-readme.config.js](./awesome-readme.config.js)
- - [eslint.config.mjs](./eslint.config.mjs)
- - [hardhat.config.ts](./hardhat.config.ts)
- - [package-lock.json](./package-lock.json)
- - [package.json](./package.json)
- - [tsconfig.json](./tsconfig.json)
- - [tsconfig.prod.json](./tsconfig.prod.json)
-
-
-### Other option
-<details>
-<summary>Clone this repository and create a symlink</summary>
-
-```
-git clone https://github.com/marc-aurele-besner/deployment-tool
-
-cd deployment-tool
-
-npm install
-
-npm run build
-
-npm link
-```
-
-in the hardhat project, you want to use this plugin
-
-```
-npm link deployment-tool
-```
-</details>
+An absolute path is passed through unchanged; otherwise the value is resolved against `paths.root`. The default is `<root>/deployment`.
 
 ## Tasks
 
+The plugin registers five tasks:
+
+| Task | Description |
+| --- | --- |
+| `deployment` | Interactive menu that asks which task to run |
+| `deploy-contract` | Deploy an upgradeable proxy, initialize it, save the address, commit, pull, and push |
+| `upgrade-contract` | Upgrade an existing proxy, save the address, commit, pull, and push |
+| `deploy-contract-static` | Deploy a non-upgradeable contract, save the address, commit, pull, and push |
+| `test-deploy-then-upgrade-contract` | Deploy then upgrade a proxy in a single call (useful for local tests) |
+
+Run any of them with `npx hardhat <task>` or `deployment-tool <task>`.
+
+### `deploy-contract`
+
 ```
-npx hardhat deployment
-npx hardhat deploy-contract
-npx hardhat upgrade-contract
-npx hardhat deploy-contract-static
-npx hardhat test-deploy-then-upgrade-contract
+hardhat deploy-contract \
+    --contract-name <string> \
+    --initialize-arguments <csv> \
+    --initialize-signature <string> \
+    --tag <string> \
+    --extra <string> \
+    --skip-git <true|false> \
+    --verify-contract <true|false>
 ```
 
-### The `deployment-tool` command
+- `--initialize-arguments` is comma-separated and forwarded to the contract's `initialize` function.
+- `--initialize-signature` defaults to `initialize` when omitted.
+- `--verify-contract` defaults to `true`; pass `false` to skip Etherscan verification.
+- `--skip-git` defaults to `false`; pass `true` to keep the working tree untouched.
+- Omit `--contract-name` to answer the prompts interactively.
 
-The package also ships a small `deployment-tool` binary. It lists the available
-tasks and forwards a task to your project's Hardhat, so these are equivalent:
+### `upgrade-contract`
 
 ```
-deployment-tool deploy-contract --contract-name MyContract
+hardhat upgrade-contract \
+    --contract-name <string> \
+    --tag <string> \
+    --extra <string> \
+    --skip-git <true|false> \
+    --verify-contract <true|false>
+```
+
+### `deploy-contract-static`
+
+```
+hardhat deploy-contract-static \
+    --contract-name <string> \
+    --constructor-arguments <csv> \
+    --tag <string> \
+    --extra <string> \
+    --skip-git <true|false> \
+    --verify-contract <true|false>
+```
+
+- `--constructor-arguments` is comma-separated.
+
+### `test-deploy-then-upgrade-contract`
+
+Same options as `deploy-contract`.
+
+### The `deployment-tool` binary
+
+The package also ships a `deployment-tool` binary that lists tasks and forwards them to your project's Hardhat:
+
+```bash
+deployment-tool deploy-contract --contract-name MyContract   # equivalent to
 npx hardhat deploy-contract --contract-name MyContract
+
+deployment-tool --help       # list every task
+deployment-tool --version    # print the installed version
 ```
 
-```
-deployment-tool --help      # list every task
-deployment-tool --version   # print the installed version
-```
+## Programmatic API
 
-### Task: deploy-contract
+Hardhat 3 removed the `extendEnvironment` hook this plugin used in Hardhat 2, so `hre.contractDeployment` is no longer attached. Use the `createContractDeployment` factory instead:
 
-Usage: hardhat [GLOBAL OPTIONS] deploy-contract [--contract-name <STRING>] [--extra <STRING>] [--initialize-arguments <STRING>] [--initialize-signature <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]
+```ts
+import hre from 'hardhat'
+import { createContractDeployment } from 'deployment-tool/dist/lib.js'
 
-OPTIONS:
+const connection = await hre.network.connect()
+const cd = createContractDeployment(hre, connection)
 
-- --contract-name               The name of the contract to deploy (default: "")
-- --extra                       Extra data to save with this deployment (default: "")
-- --initialize-arguments        The initialize() argument (default: "")
-- --initialize-signature        Function signature of the initialize function (default: "")
-- --skip-git                    Skit git commit, pull & push (default: "false")
-- --tag                         Add a extra tag to this version of the contract (default: "")
-- --verify-contract             Validate the contract on Etherscan.io (default: "false")
-
-deploy-contract: Deploy a proxy contract, initialize it, save the address, commit, pull and push
-
-### Task: upgrade-contract
-
-Usage: hardhat [GLOBAL OPTIONS] upgrade-contract [--contract-name <STRING>] [--extra <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]
-
-OPTIONS:
-
-- --contract-name       The name of the contract to deploy (default: "")
-- --extra               Extra data to save with this deployment (default: "")
-- --skip-git            Skit git commit, pull & push (default: "false")
-- --tag                 Add a extra tag to this version of the contract (default: "")
-- --verify-contract     Validate the contract on Etherscan.io (default: "false")
-
-upgrade-contract: Upgrade a proxy contract, save the address, commit, pull and push
-
-### Task: deploy-contract-static
-
-Usage: hardhat [GLOBAL OPTIONS] deploy-contract-static [--contract-name <STRING>] [--extra <STRING>] [--constructor-arguments <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]
-
-OPTIONS:
-
-- --contract-name               The name of the contract to deploy (default: "")
-- --extra                       Extra data to save with this deployment (default: "")
-- --constructor-arguments        The constructor() argument (default: "")
-- --skip-git                    Skit git commit, pull & push (default: "false")
-- --tag                         Add a extra tag to this version of the contract (default: "")
-- --verify-contract             Validate the contract on Etherscan.io (default: "false")
-
-deploy-contract-static: Deploy a static contract, save the address, commit, pull and push
-
-### Task: test-deploy-then-upgrade-contract
-
-Usage: hardhat [GLOBAL OPTIONS] test-deploy-then-upgrade-contract [--contract-name <STRING>] [--extra <STRING>] [--initialize-arguments <STRING>] [--initialize-signature <STRING>] [--skip-git <STRING>] [--tag <STRING>] [--verify-contract <STRING>]
-
-OPTIONS:
-
-- --contract-name               The name of the contract to deploy (default: "")
-- --extra                       Extra data to save with this deployment (default: "")
-- --initialize-arguments        The initialize() argument (default: "")
-- --initialize-signature        Function signature of the initialize function (default: "")
-- --skip-git                    Skit git commit, pull & push (default: "false")
-- --tag                         Add a extra tag to this version of the contract (default: "")
-- --verify-contract             Validate the contract on Etherscan.io (default: "false")
-
-test-deploy-then-upgrade-contract: Upgrade a proxy contract, save the address, commit, pull and push
-
-## Functions
-
-Function allow you to use the deployment OR upgrade script in scripts or tests files, they all return a instance of the contract that you can use.
-
-```
-    const { contractDeployment } = require('hardhat');
-
-    contractDeployment.deployContract(
-        contractName: string,
-        initializeArguments: any[] = [],
-        initializeSignature: string = 'initialize',
-        tag?: string,
-        extra?: any,
-        skipGit?: boolean,
-        verifyContract?: boolean
-    )
-    contractDeployment.upgradeContract(
-        contractName: string,
-        tag?: string,
-        extra?: any,
-        skipGit?: boolean,
-        verifyContract?: boolean
-    )
-    contractDeployment.testDeployThenUpgradeContract(
-        contractName: string,
-        initializeArguments: any[] = [],
-        initializeSignature: string = 'initialize',
-        tag?: string,
-        extra?: any,
-        skipGit?: boolean,
-        verifyContract?: boolean
-    )
-```
-    
-## Directory Tree
-```
-deployment-tool/
-│   .npmignore
-│   .prettierignore
-│   .prettierrc
-│   CONTRIBUTING.md
-│   LICENSE
-│   README3.md
-│   awesome-readme.config.js
-│   eslint.config.mjs
-│   hardhat.config.ts
-│   package-lock.json
-│   package.json
-│   tsconfig.json
-│   tsconfig.prod.json
+const result = await cd.deployContract(
+    'GreeterV1',
+    ['hello world'], // initialize arguments
+    'initialize' // initialize function signature
+)
 ```
 
-### Dependencies
+`createContractDeployment` returns a `ContractDeployment` wrapper with the following methods:
 
-This package/plugin use other hardhat plugins that you can then reuse, for example https://www.npmjs.com/package/hardhat-awesome-cli is used to save the contract address and initialization details, this can be access with a function like 
-```
-const { addressBook } = require('hardhat');
-addressBook.retrieveContractObject(contractName: string, deployedNetwork: string)
+```ts
+cd.deployContract(
+    contractName: string,
+    initializeArguments: any[] = [],
+    initializeSignature: string = 'initialize',
+    tag?: string,
+    extra?: any,
+    skipGit?: boolean,
+    verify?: boolean
+)
+
+cd.upgradeContract(
+    contractName: string,
+    tag?: string,
+    extra?: any,
+    skipGit?: boolean,
+    verify?: boolean
+)
+
+cd.testDeployThenUpgradeContract(
+    contractName: string,
+    initializeArguments: any[] = [],
+    initializeSignature: string = 'initialize',
+    tag?: string,
+    extra?: any,
+    skipGit?: boolean,
+    verify?: boolean
+)
+
+cd.deployContractStatic(
+    contractName: string,
+    constructorArguments: any[] = [],
+    tag?: string,
+    extra?: any,
+    skipGit?: boolean,
+    verify?: boolean
+)
 ```
 
+Returns are result objects, not contract instances. Proxy deploy/upgrade calls return `{ success, message, contractName, contract, proxyAddress, proxyAdminAddress, error? }`; static deploys return `{ success, message, contractName, contract, address, error? }`. Compilation failures return `{ success: false, message: 'Compilation failed', error }` without throwing.
+
+## Saving addresses with `hardhat-awesome-cli`
+
+The plugin writes deployment metadata via [`hardhat-awesome-cli`](https://www.npmjs.com/package/hardhat-awesome-cli). `AwesomeAddressBook` is constructed per connection — read it back from your own scripts:
+
+```ts
+import { AwesomeAddressBook } from 'hardhat-awesome-cli/plugin'
+
+const connection = await hre.network.connect()
+const book = new AwesomeAddressBook(hre.config as any, connection.networkName)
+
+const { address, initializeArguments } = book.retrieveContractObject('GreeterV1', connection.networkName)
+```
+
+## Local development
+
+<details>
+<summary>Clone this repository and create a symlink</summary>
+
+```bash
+git clone https://github.com/marc-aurele-besner/deployment-tool
+cd deployment-tool
+npm install
+npm run build
+npm link
+```
+
+In the Hardhat project where you want to use the plugin:
+
+```bash
+npm link deployment-tool
+```
+
+</details>
+
+## Peer dependencies
+
+- `hardhat ^3.0.0`
+- `@nomicfoundation/hardhat-ethers ^4.0.0`
+- `@nomicfoundation/hardhat-verify ^3.0.10`
+- `@openzeppelin/hardhat-upgrades ^4.0.0`
+- `hardhat-awesome-cli ^0.7.2`
+
+## License
+
+[MIT](./LICENSE)
